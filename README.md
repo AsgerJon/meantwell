@@ -38,13 +38,20 @@ This robotic minecraft player tries to help you and follow your instructions.
   high, by sprint and its look, through a gap one block high, and out at a bank. It comes up from under water
   (`surface`) and paddles upright at the top (`paddle`), the way every version has. It plays the body by five of a
   player's means: perceive, key down, key up, look, ticks.
+- **Gliding:** `Glider(body)` opens an elytra's wings (`takeOff`: one press of jump as it falls, or a forward jump
+  first where it stands) and glides to a place (`glide`). It steers by its look alone, choosing its pitch by flying
+  the game's own reckoning of an elytra ahead (`glide.py`), and comes down softly, sliding to rest at the place.
 - **In a real game** (26.3, the practice instance in `unittas.toml`), by a player's inputs alone:
   - on flat ground the traveller arrived each time where `walkTo` alone stopped, and across natural terrain it
     arrived on five trips of 40 to 82 blocks;
   - the swimmer came up from the bed of a pool three deep, stayed afloat and paddled out; swam it level under
-    water from end to end at 0.17 blocks a tick, out at the bank, and through a gap one block high.
+    water from end to end at 0.17 blocks a tick, out at the bank, and through a gap one block high;
+  - the glider, from a tower 40 high, came to rest within 1.8 blocks of places 70 to 200 blocks off on flat
+    ground, eight glides of eight, each softly. Its model of the flight stayed within 0.04 blocks of the game's
+    over flights of up to 520 ticks.
 - **Not yet:** the traveller swimming water it can't see across (it goes round, or says there is no way); a thing
-  found by looking; a whole task as one instruction; instructions typed in a terminal.
+  found by looking; a whole task as one instruction; instructions typed in a terminal; rockets, and a glide to
+  ground that isn't flat.
 
 ## Its practice runs
 

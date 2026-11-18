@@ -15,7 +15,11 @@ and maneuvering (SPEC.md 21.11).
 - words: how things are said.
 - atlas: Atlas, what the agent remembers of the ground, look by look.
 - traveller: Traveller, long trips on what it remembers.
+- routine: Routine, what the routines below share: a body played
+  directly by a player's means, and the keys it holds.
 - swimmer: Swimmer, to a place as 1.13 swims, or upright at the top.
+- glide: how an elytra flies and comes down, as the game reckons it.
+- glider: Glider, which opens its wings and glides to a place.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
