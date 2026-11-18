@@ -13,8 +13,8 @@ requires-python = ">=3.14"
 license = "Apache-2.0"
 authors = [{ name = "Asger Jon Vistisen" }]
 # what the package stands on (SPEC.md 21.6): unittas is its body (the game, the probe's protocol and, until the
-# lift-out, the agent's skills), installed from unitTAS's own tree (its python/ folder), not from an index
-dependencies = ["worktoy>=1.2.2", "mcdex>=0.2.0", "unittas>=0.1.0.dev0"]
+# lift-out, the agent's skills); 0.1.0.dev19 is its first on PyPI
+dependencies = ["worktoy>=1.2.2", "mcdex>=0.2.0", "unittas>=0.1.0.dev19"]
 
 [project.urls]
 Homepage = "https://github.com/AsgerJon/meantwell"

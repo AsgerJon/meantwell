@@ -40,8 +40,7 @@ This robotic minecraft player tries to help you and follow your instructions.
 python -m unittest discover -s tests/unit
 ```
 
-They need no game. They need worktoy, mcdex and unittas installed; unittas comes from unitTAS's own tree (its
-`python/` folder), not from an index.
+They need no game. `pip install -e .` brings what they need: worktoy, mcdex and unittas.
 
 ## License
 
