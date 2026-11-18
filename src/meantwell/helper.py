@@ -2,8 +2,8 @@
 Helper: what follows instructions (SPEC.md 21.7 step 3): an agent, and
 someone to tell. Following an instruction asks the agent's own steps,
 and what comes of it is said and given back (SPEC.md 21.3: it says what
-it did and saw). The helper never holds a game: the agent is all it has
-of one.
+it did and saw). To go is a trip by its traveller, however far (SPEC.md
+21.11). The helper never holds a game: the agent is all it has of one.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -22,6 +22,7 @@ from .instruction import Instruction
 from .outcome import Outcome
 from .question import Question
 from .steps import Steps
+from .traveller import Traveller
 from .verb import Verb
 from .when import When
 from .words import met, named, stack, stacks, where
@@ -39,7 +40,9 @@ class Helper(BaseObject):
   terminal, the chat. A step the agent can't complete (its
   TesttimeError) is an outcome not done, naming the step and why.
   Anything else that goes wrong is raised: a game that is gone, or an
-  instruction the agent's step refuses, is no outcome of the step.
+  instruction the agent's step refuses, is no outcome of the step. What
+  its traveller was shown of the ground on one trip, it remembers on the
+  next.
 
     helper = Helper(agent, print)
     helper.follow(Action(Verb.USE, MCBlocks.Lever, BlockPos(5, 4, 7)))
@@ -60,9 +63,12 @@ class Helper(BaseObject):
   __agent__: Agent = None
   #  Whom each outcome's line is said to
   __say__: Callable = None
+  #  The agent's traveller, which goes where it is told to go
+  __traveller__: Traveller = None
 
   #  Public Variables
   agent = Field()
+  traveller = Field()
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
   #  GETTERS  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -72,6 +78,11 @@ class Helper(BaseObject):
   def _getAgent(self) -> Agent:
     """The agent that carries the instructions out."""
     return self.__agent__
+
+  @traveller.GET
+  def _getTraveller(self) -> Traveller:
+    """The agent's traveller, with what it remembers of the ground."""
+    return self.__traveller__
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
   #  SETTERS  # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -92,6 +103,7 @@ class Helper(BaseObject):
                       'each line, not %r' % (say,))
     self.__agent__ = agent
     self.__say__ = say
+    self.__traveller__ = Traveller(agent)
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
   #  DOMAIN SPECIFIC  # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -155,7 +167,7 @@ class Helper(BaseObject):
       agent.close()
       return None, ''
     if verb is Verb.GO:
-      seen = agent.walkTo(action.place, **budget)
+      seen = self.__traveller__.travel(action.place, **budget)
       return seen, 'at %s' % where(seen.pos)
     if verb is Verb.TAKE:
       moved = agent.take(action.thing)

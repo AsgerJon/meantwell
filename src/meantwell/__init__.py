@@ -15,6 +15,7 @@ and maneuvering (SPEC.md 21.11).
 - words: how things are said.
 - atlas: Atlas, what the agent remembers of the ground, look by look.
 - traveller: Traveller, long trips on what it remembers.
+- swimmer: Swimmer, to a place as 1.13 swims, or upright at the top.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen

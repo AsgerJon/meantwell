@@ -33,10 +33,25 @@ This robotic minecraft player tries to help you and follow your instructions.
 
 - **Long trips:** `Traveller(agent).travel(place)` goes further than one look shows. It remembers the ground it was
   shown (`Atlas`), goes to the edge of it to look further, and so gets around a wall wider than a look and out of a
-  dead end, where the agent's own `walkTo` stops.
-- **Not yet:** it has played no game of its own. The helper is tested on an agent that only records what it is
-  asked, and the traveller in a world of whole blocks with no physics. The helper alone in a world, with
-  instructions typed in a terminal, comes next.
+  dead end, where the agent's own `walkTo` stops. The helper's `go` is such a trip.
+- **Swimming:** `Swimmer(body)` swims to a place as 1.13 has swimming (`swim`): laid level under water, one block
+  high, by sprint and its look, through a gap one block high, and out at a bank. It comes up from under water
+  (`surface`) and paddles upright at the top (`paddle`), the way every version has. It plays the body by five of a
+  player's means: perceive, key down, key up, look, ticks.
+- **In a real game** (26.3, the practice instance in `unittas.toml`), by a player's inputs alone:
+  - on flat ground the traveller arrived each time where `walkTo` alone stopped, and across natural terrain it
+    arrived on five trips of 40 to 82 blocks;
+  - the swimmer came up from the bed of a pool three deep, stayed afloat and paddled out; swam it level under
+    water from end to end at 0.17 blocks a tick, out at the bank, and through a gap one block high.
+- **Not yet:** the traveller swimming water it can't see across (it goes round, or says there is no way); a thing
+  found by looking; a whole task as one instruction; instructions typed in a terminal.
+
+## Its practice runs
+
+`meantwell_watch.py` is meantwell's own watcher: started by a person on the Python that has unittas, it makes the
+game runs a session asks for, one at a time, on its own queue (`meantwell-queue/`). A line of tests in
+`meantwell-queue/request` is a run of `unittas run` on the practice instance; its report lands in
+`unittas-results/`.
 
 ## Its tests
 

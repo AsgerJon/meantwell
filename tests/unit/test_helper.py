@@ -2,7 +2,9 @@
 The helper following an action or an examination (SPEC.md 21.7 step 3),
 without a game, on an agent that only records what it is asked
 (recorder.py). Each instruction asks the agent's own step, with its
-parts. What comes of it is said to the helper's listener and given back:
+parts; to go is a trip by the helper's traveller, however far (SPEC.md
+21.11, M2), tried here in the grid agent's world (gridworld.py). What
+comes of it is said to the helper's listener and given back:
 done, with what the agent saw; or not done, with the step and why, when
 the agent couldn't complete it (TesttimeError). It never says done of a
 step the agent didn't complete, and anything else that goes wrong is
@@ -16,11 +18,13 @@ import unittest
 
 from mcdex import MCBlocks, MCItems
 
+from gridworld import GROUND, GridAgent, arena, wall
 from meantwell.action import Action
 from meantwell.examination import Examination
 from meantwell.helper import Helper
 from meantwell.outcome import Outcome
 from meantwell.question import Question
+from meantwell.traveller import Traveller
 from meantwell.verb import Verb
 from recorder import Recorder
 from unittas.container import Container
@@ -54,8 +58,6 @@ class HelperTests(unittest.TestCase):
 
   def test_each_action_asks_the_agents_own_step(self) -> None:
     for action, asked in (
-        (Action(Verb.GO, place=SPOT), ('walkTo', (SPOT,), {})),
-        (Action(Verb.GO, place=LEVER), ('walkTo', (LEVER,), {})),
         (Action(Verb.USE, MCBlocks.Lever, LEVER), ('use', (LEVER,), {})),
         (Action(Verb.BREAK, place=STONE), ('breakBlock', (STONE,), {})),
         (Action(Verb.PLACE, MCItems.Stone, STONE),
@@ -68,15 +70,13 @@ class HelperTests(unittest.TestCase):
         (Action(Verb.WAIT, ticks=40), ('wait', (40,), {}))):
       with self.subTest(action=str(action)):
         outcome, was = self.follow(action, answers={
-          'walkTo': SEEN, 'use': SEEN, 'breakBlock': SEEN, 'place': SEEN,
+          'use': SEEN, 'breakBlock': SEEN, 'place': SEEN,
           'open': Container(slots=(WOOL,)), 'take': WOOL, 'put': WOOL})
         self.assertEqual([asked], was)
         self.assertTrue(outcome.done)
 
   def test_a_tick_budget_goes_with_the_step(self) -> None:
     for action, asked in (
-        (Action(Verb.GO, place=SPOT, ticks=200),
-         ('walkTo', (SPOT,), {'ticks': 200})),
         (Action(Verb.USE, place=LEVER, ticks=90),
          ('use', (LEVER,), {'ticks': 90})),
         (Action(Verb.BREAK, place=STONE, ticks=50),
@@ -87,7 +87,7 @@ class HelperTests(unittest.TestCase):
          ('open', (CHEST,), {'ticks': 60}))):
       with self.subTest(action=str(action)):
         _, was = self.follow(action, answers={
-          'walkTo': SEEN, 'use': SEEN, 'breakBlock': SEEN, 'place': SEEN,
+          'use': SEEN, 'breakBlock': SEEN, 'place': SEEN,
           'open': Container(slots=(WOOL,))})
         self.assertEqual([asked], was)
 
@@ -109,8 +109,6 @@ class HelperTests(unittest.TestCase):
   def test_done_says_what_the_agent_saw(self) -> None:
     modern = Item('minecraft:pink_wool', 2, -1)
     for said, instruction, answers in (
-        ('done: go to (6.50, 4.00, 4.50): ' + THERE,
-         Action(Verb.GO, place=SPOT), {'walkTo': SEEN}),
         ('done: use MCBlocks.Lever at (5, 4, 7): ' + MET,
          Action(Verb.USE, MCBlocks.Lever, LEVER), {'use': SEEN}),
         ('done: break the block at (3, 4, 6): ' + THERE +
@@ -203,7 +201,53 @@ class HelperTests(unittest.TestCase):
 
   def test_its_agent_is_the_one_it_was_made_with(self) -> None:
     recorder = Recorder()
-    self.assertIs(recorder, Helper(recorder, self.said.append).agent)
+    helper = Helper(recorder, self.said.append)
+    self.assertIs(recorder, helper.agent)
+    self.assertIsInstance(helper.traveller, Traveller)
+    self.assertIs(recorder, helper.traveller.agent)
+
+  def test_to_go_is_a_trip_however_far(self) -> None:
+    #  beyond a wall wider than a look, where walkTo alone stops
+    goal = Vec3(4.5, GROUND, 24.5)
+    agent = GridAgent(arena(40, 30) | wall(0, 14, 33, 14),
+                      Vec3(4.5, GROUND, 4.5))
+    action = Action(Verb.GO, place=goal)
+    outcome = Helper(agent, self.said.append).follow(action)
+    self.assertTrue(outcome.done)
+    self.assertEqual(goal, agent.pos)
+    self.assertEqual(goal, outcome.value.pos)
+    self.assertEqual(['done: go to (4.50, 4.00, 24.50): at (4.50, 4.00, '
+                      '24.50)'], self.said)
+
+  def test_to_go_where_there_is_no_way_is_not_done(self) -> None:
+    #  the goal walled in
+    world = (arena(20, 20) | wall(8, 13, 12, 13) | wall(8, 17, 12, 17) |
+             wall(8, 13, 8, 17) | wall(12, 13, 12, 17))
+    agent = GridAgent(world, Vec3(10.5, GROUND, 2.5))
+    outcome = Helper(agent, self.said.append).follow(
+      Action(Verb.GO, place=Vec3(10.5, GROUND, 15.5)))
+    self.assertFalse(outcome.done)
+    self.assertEqual('travel', outcome.error.step)
+    self.assertTrue(self.said[0].startswith(
+      'not done: go to (10.50, 4.00, 15.50): travel: no way to (10.50, '
+      '4.00, 15.50)'), self.said[0])
+
+  def test_a_tick_budget_goes_with_the_trip(self) -> None:
+    agent = GridAgent(arena(12, 40), Vec3(6.5, GROUND, 2.5))
+    outcome = Helper(agent, self.said.append).follow(
+      Action(Verb.GO, place=Vec3(6.5, GROUND, 36.5), ticks=40))
+    self.assertFalse(outcome.done)
+    self.assertIn('the tick budget (40) is spent', self.said[0])
+
+  def test_it_remembers_from_one_go_to_the_next(self) -> None:
+    agent = GridAgent(arena(12, 40), Vec3(6.5, GROUND, 2.5))
+    helper = Helper(agent, self.said.append)
+    helper.follow(Action(Verb.GO, place=Vec3(6.5, GROUND, 36.5)))
+    seen = helper.traveller.atlas.columns
+    self.assertGreater(seen, 0)
+    helper.follow(Action(Verb.GO, place=Vec3(6.5, GROUND, 2.5)))
+    self.assertEqual(Vec3(6.5, GROUND, 2.5), agent.pos)
+    self.assertGreaterEqual(helper.traveller.atlas.columns, seen)
 
 
 if __name__ == '__main__':

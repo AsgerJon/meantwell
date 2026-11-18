@@ -16,6 +16,8 @@ from worktoy.desc import Field
 from worktoy.mcls import BaseObject
 
 from unittas.errors import TesttimeError
+from unittas.nearblock import NearBlock
+from unittas.perception import Perception
 from unittas.terrain import Terrain
 from unittas.values import BlockPos, Vec3
 
@@ -26,9 +28,11 @@ if TYPE_CHECKING:  # pragma: no cover
   from typing import Iterator, Optional, Union
 
   from unittas.agent import Agent
-  from unittas.perception import Perception
 
 _EPS = 1e-6
+#  What water it won't swim is called, on the ground it plans on: a
+#  liquid that is no water to Terrain, and so never a way
+_DEEP = 'meantwell:water_not_seen_across'
 _AROUND = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1),
            (-1, -1))
 
@@ -64,6 +68,11 @@ class Traveller(BaseObject):
   AROUND = 64
   #  How many legs in a row the agent may fail to complete
   STOPS = 3
+  #  How far from ground it can stand on it swims, in columns: water
+  #  further out is water it can't see across. The agent's walkTo to a
+  #  place in water walks in and sinks, and no step of its own brings it
+  #  up again (SPEC.md 21.14)
+  BANK = 3
 
   #  Fallback Variables
 
@@ -218,7 +227,7 @@ class Traveller(BaseObject):
     gx, gz = math.floor(place.x), math.floor(place.z)
     far = max(abs(gx - cx), abs(gz - cz))
     around = min(self.AROUND, far + 2 * self.LOOK[0])
-    terrain = Terrain(self.__atlas__.ground(pos, around), around, 0, 0)
+    terrain = self._terrain(pos, around)
     if terrain.inside(gx, gz) and self.__atlas__.knows(gx, gz):
       path, _ = terrain.path(pos, place)
       if path is not None:
@@ -229,6 +238,30 @@ class Traveller(BaseObject):
       if path is not None:
         return self._leg(terrain, pos, path, False)
     return None
+
+  def _terrain(self, pos: Vec3, around: int) -> Terrain:
+    """
+    What a player can walk, on what it remembers around 'pos': Terrain's
+    own rules, but for this: water with no ground to stand on within
+    BANK columns is no way. It swims only water it can see across.
+    """
+    ground = self.__atlas__.ground(pos, around)
+    terrain = Terrain(ground, around, 0, 0)
+    reach = range(-self.BANK, self.BANK + 1)
+    deep = set()
+    for x, z in set((near.pos.x, near.pos.z) for near in ground.blocks
+                    if near.liquid):
+      if terrain.surfaces(x, z) and not any(
+          terrain.floors(x + dx, z + dz) for dx in reach for dz in reach):
+        deep.add((x, z))
+    if not deep:
+      return terrain
+    blocks = tuple(
+      NearBlock(near.pos, _DEEP, near.meta, near.boxes, True,
+                near.climbable, near.opens, near.state)
+      if near.liquid and (near.pos.x, near.pos.z) in deep else near
+      for near in ground.blocks)
+    return Terrain(Perception(pos=ground.pos, blocks=blocks), around, 0, 0)
 
   def _leg(self, terrain: Terrain, pos: Vec3, path: list,
            whole: bool) -> tuple:
@@ -265,13 +298,14 @@ class Traveller(BaseObject):
     """
     The places to look further from, best first: where it can stand, by
     a rough reckoning, in a column at the edge of what it has seen; best
-    by the way there plus what is left from it to the place.
+    by the way there plus what is left from it to the place. Never a
+    place in water: it looks further from ground.
     """
     cx, cz = math.floor(pos.x), math.floor(pos.z)
     edges = set(self.__atlas__.edges(cx, cz, around))
     scored = []
     for (x, z, h), steps in self._reach(terrain, pos).items():
-      if (x, z) not in edges or (x, z) == (cx, cz):
+      if (x, z) not in edges or (x, z) == (cx, cz) or terrain.wet(x, z, h):
         continue
       onward = math.hypot(x + 0.5 - place.x, z + 0.5 - place.z) + abs(
         h - place.y)

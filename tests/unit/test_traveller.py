@@ -16,7 +16,8 @@ from __future__ import annotations
 import math
 import unittest
 
-from gridworld import GROUND, GridAgent, arena, stoodIn, wall
+from gridworld import (GROUND, GridAgent, arena, lake, stoodIn,
+                       stoodInWater, wall)
 from meantwell.atlas import Atlas
 from meantwell.traveller import Traveller
 from stoppedagent import StoppedAgent
@@ -96,6 +97,37 @@ class TravellerTests(unittest.TestCase):
     #  it looked everywhere it could get to before it said so
     self.assertTrue(all(traveller.atlas.knows(x, z) for x in range(20)
                         for z in range(20)))
+
+  def test_a_lake_wider_than_a_look_is_gone_round(self) -> None:
+    #  found in the game (SPEC.md 21.14): the edge of what it had seen
+    #  lay in water, it went there, and the agent walked in and sank
+    world, water = lake(arena(40, 34), 6, 12, 33, 20)
+    start, goal = Vec3(20.5, GROUND, 4.5), Vec3(20.5, GROUND, 28.5)
+    agent = GridAgent(world, start, water)
+    Traveller(agent).travel(goal)
+    self.assertEqual(goal, agent.pos)
+    self.assertFalse(agent.sunk)
+    self.assertEqual(0, stoodInWater(agent), 'no leg ends in water')
+
+  def test_water_it_sees_across_is_swum(self) -> None:
+    #  a river four wide from side to side: no way round it
+    world, water = lake(arena(20, 30), 0, 12, 19, 15)
+    start, goal = Vec3(10.5, GROUND, 4.5), Vec3(10.5, GROUND, 24.5)
+    agent = GridAgent(world, start, water)
+    Traveller(agent).travel(goal)
+    self.assertEqual(goal, agent.pos)
+    self.assertFalse(agent.sunk)
+    self.assertEqual(0, stoodInWater(agent))
+
+  def test_water_too_wide_to_see_across_is_no_way(self) -> None:
+    #  water ten wide from side to side, the goal beyond it
+    world, water = lake(arena(20, 34), 0, 12, 19, 21)
+    agent = GridAgent(world, Vec3(10.5, GROUND, 4.5), water)
+    with self.assertRaises(TesttimeError) as stopped:
+      Traveller(agent).travel(Vec3(10.5, GROUND, 28.5))
+    self.assertIn('no way to (10.50, 4.00, 28.50)', str(stopped.exception))
+    self.assertFalse(agent.sunk, 'it stays out of water it can\'t cross')
+    self.assertEqual(0, stoodInWater(agent))
 
   def test_the_tick_budget_spent(self) -> None:
     agent = GridAgent(arena(12, 40), Vec3(6.5, GROUND, 2.5))

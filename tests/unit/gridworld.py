@@ -8,9 +8,14 @@ agent's walkTo decides: by unittas's own Terrain on one look of 8, to
 the seen place nearest a place further off, 12 looks at most. Where the
 real agent then moves by its keys, this one is simply there, 5 ticks a
 block. It has no physics: what a player can walk is Terrain's to say.
+One thing of the real agent's it keeps, found in the game (SPEC.md
+21.14): a walk that ends at a place in water walks in and sinks to the
+bed, and from there nothing is a way.
 
 - arena(wide, deep): a floor with a wall two high around it.
 - wall(x0, z0, x1, z1): a wall two high on the floor, between corners.
+- lake(solid, x0, z0, x1, z1): the floor between the corners dug out
+  three deep and filled with water; (the solid blocks then, the water).
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -46,6 +51,19 @@ def arena(wide: int, deep: int) -> set:
           wall(-1, -1, -1, deep) | wall(wide, -1, wide, deep))
 
 
+def lake(solid: set, x0: int, z0: int, x1: int, z1: int) -> tuple:
+  """
+  Water three deep where the floor was, between the corners, its top
+  level with the ground: (the solid blocks then, the water's cells).
+  """
+  columns = [(x, z) for x in range(min(x0, x1), max(x0, x1) + 1)
+             for z in range(min(z0, z1), max(z0, z1) + 1)]
+  depths = (FLOOR, FLOOR - 1, FLOOR - 2)
+  dug = set(solid) - {(x, y, z) for x, z in columns for y in depths}
+  bed = {(x, FLOOR - 3, z) for x, z in columns}
+  return dug | bed, {(x, y, z) for x, z in columns for y in depths}
+
+
 class GridAgent:
   """
   An agent in a world of whole blocks: 'solid' holds each block's (x, y,
@@ -53,14 +71,19 @@ class GridAgent:
   was asked for, each with its margin; 'looks' counts its perceptions;
   'stood' is every place a walk ended at. 'onLeg', when set, is called
   with the agent before each walkTo: a world that changes on the way.
+  'water' holds each water cell's (x, y, z); 'sunk' says whether a walk
+  ended in it.
   """
 
   LOOK = (8, 3, 3)
   LOOKS = 12
   PACE = 5
 
-  def __init__(self, solid: set, start: Vec3) -> None:
+  def __init__(self, solid: set, start: Vec3,
+               water: Optional[set] = None) -> None:
     self.solid = set(solid)
+    self.water = set(water or ())
+    self.sunk = False
     self.pos = start
     self.tick = 0
     self.looks = 0
@@ -81,6 +104,11 @@ class GridAgent:
     blocks = tuple(NearBlock(BlockPos(x, y, z), 'minecraft:stone', 0, (
       Box(float(x), float(y), float(z), x + 1.0, y + 1.0, z + 1.0),))
       for x, y, z in near)
+    wet = sorted((x, y, z) for x, y, z in self.water
+                 if abs(x - fx) <= around and abs(z - fz) <= around and
+                 fy - below <= y <= fy + 1 + above)
+    blocks += tuple(NearBlock(BlockPos(x, y, z), 'minecraft:water', 0, (),
+                              True) for x, y, z in wet)
     return Perception(tick=self.tick, pos=self.pos, blocks=blocks)
 
   def walkTo(self, place: Union[Vec3, BlockPos], within: float = 0.25,
@@ -107,6 +135,7 @@ class GridAgent:
           raise TesttimeError('walkTo', self.perceive(), 'the tick budget '
                               '(%d) is spent on the way' % ticks)
       if whole:
+        self._sink()
         self.stood.append(self.pos)
         return self.perceive()
       seen = self.perceive(*self.LOOK)
@@ -114,6 +143,21 @@ class GridAgent:
     raise TesttimeError('walkTo', seen, '(%.2f, %.2f, %.2f) is further than '
                         '%d looks around took the agent' % (
                           place.x, place.y, place.z, self.LOOKS))
+
+  def _sink(self) -> None:
+    """In a water column it goes down to the bed, as a walk's end does."""
+    x, z = math.floor(self.pos.x), math.floor(self.pos.z)
+    depths = [y for wx, y, wz in self.water if (wx, wz) == (x, z)]
+    if depths:
+      self.sunk = True
+      self.pos = Vec3(self.pos.x, float(min(depths)), self.pos.z)
+
+
+def stoodInWater(agent: GridAgent) -> int:
+  """How many of the places its walks ended at are in a water column."""
+  wet = {(x, z) for x, _, z in agent.water}
+  return sum(1 for pos in agent.stood
+             if (math.floor(pos.x), math.floor(pos.z)) in wet)
 
 
 def stoodIn(agent: GridAgent, x0: int, z0: int, x1: int, z1: int) -> int:

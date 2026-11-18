@@ -19,7 +19,7 @@ SOURCE = os.path.join(ROOT, 'src', 'meantwell')
 #  what a module of meantwell may import of unittas as it runs, and what
 #  more as a type only
 RUNNING = {'unittas.errors', 'unittas.values', 'unittas.perception',
-           'unittas.terrain'}
+           'unittas.nearblock', 'unittas.terrain'}
 TYPES = {'unittas.agent'}
 
 
