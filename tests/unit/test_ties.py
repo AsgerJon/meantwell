@@ -1,8 +1,9 @@
 """
 meantwell's ties to unitTAS (SPEC.md 21.3, 21.6), read from its source:
-it never holds a game. Its modules take unittas's values and errors, and
-the agent as a type only (under TYPE_CHECKING); never the game's face
-(api), the run or a test case.
+it never holds a game. Its modules take unittas's values (the
+perception among them), its errors and its rules for the ground
+(terrain), and the agent as a type only (under TYPE_CHECKING); never the
+game's face (api), the run or a test case.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -17,7 +18,8 @@ from test_ground import ROOT
 SOURCE = os.path.join(ROOT, 'src', 'meantwell')
 #  what a module of meantwell may import of unittas as it runs, and what
 #  more as a type only
-RUNNING = {'unittas.errors', 'unittas.values'}
+RUNNING = {'unittas.errors', 'unittas.values', 'unittas.perception',
+           'unittas.terrain'}
 TYPES = {'unittas.agent'}
 
 

@@ -31,8 +31,12 @@ This robotic minecraft player tries to help you and follow your instructions.
   # done: 3 steps
   ```
 
-- **Not yet:** it has played no game of its own. So far the helper is tested on an agent that only records what it
-  is asked. The helper alone in a world, with instructions typed in a terminal, comes next.
+- **Long trips:** `Traveller(agent).travel(place)` goes further than one look shows. It remembers the ground it was
+  shown (`Atlas`), goes to the edge of it to look further, and so gets around a wall wider than a look and out of a
+  dead end, where the agent's own `walkTo` stops.
+- **Not yet:** it has played no game of its own. The helper is tested on an agent that only records what it is
+  asked, and the traveller in a world of whole blocks with no physics. The helper alone in a world, with
+  instructions typed in a terminal, comes next.
 
 ## Its tests
 
