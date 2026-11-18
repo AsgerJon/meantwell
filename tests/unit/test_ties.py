@@ -3,7 +3,9 @@ meantwell's ties to unitTAS (SPEC.md 21.3, 21.6), read from its source:
 it never holds a game. Its modules take unittas's values (the
 perception among them), its errors and its rules for the ground
 (terrain), and the agent as a type only (under TYPE_CHECKING); never the
-game's face (api), the run or a test case.
+game's face (api), the run or a test case. One module is the front for
+unitTAS's tests (helpertestcase.py; SPEC.md 21.19 S3) and takes the
+scenario's test case: that one, and no other.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -21,6 +23,8 @@ SOURCE = os.path.join(ROOT, 'src', 'meantwell')
 RUNNING = {'unittas.errors', 'unittas.values', 'unittas.perception',
            'unittas.nearblock', 'unittas.terrain'}
 TYPES = {'unittas.agent'}
+#  what one module may import beyond that, each a numbered decision
+FRONTS = {'helpertestcase.py': {'unittas.scenario'}}
 
 
 def _typeOnly(node: ast.AST) -> bool:
@@ -56,9 +60,29 @@ class TiesTests(unittest.TestCase):
         if module != 'unittas' and not module.startswith('unittas.'):
           continue
         allowed = RUNNING | TYPES if typed else RUNNING
+        allowed = allowed | FRONTS.get(name, set())
         self.assertIn(module, allowed, '%s imports %s%s' % (
           name, module, ' as a type' if typed else ''))
     self.assertGreater(read, 1, 'the package was read')
+
+  def test_each_front_is_there_and_takes_what_it_is_for(self) -> None:
+    for name, takes in FRONTS.items():
+      with open(os.path.join(SOURCE, name), encoding='utf-8') as file:
+        found = {module for module, _ in _imports(ast.parse(file.read()))}
+      self.assertLessEqual(takes, found, name)
+
+  def test_nothing_of_meantwell_takes_a_front(self) -> None:
+    #  whoever imports meantwell without a test has none of unitTAS's
+    #  testing with it
+    fronts = {name[:-3] for name in FRONTS}
+    for name in sorted(os.listdir(SOURCE)):
+      if not name.endswith('.py'):
+        continue
+      with open(os.path.join(SOURCE, name), encoding='utf-8') as file:
+        tree = ast.parse(file.read())
+      for module, _ in _imports(tree):
+        last = module.rsplit('.', 1)[-1]
+        self.assertNotIn(last, fronts, '%s imports %s' % (name, module))
 
   def test_the_check_sees_an_import_wherever_it_is(self) -> None:
     tree = ast.parse('\n'.join((

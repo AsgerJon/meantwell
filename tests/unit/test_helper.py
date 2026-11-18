@@ -249,6 +249,57 @@ class HelperTests(unittest.TestCase):
     self.assertEqual(Vec3(6.5, GROUND, 2.5), agent.pos)
     self.assertGreaterEqual(helper.traveller.atlas.columns, seen)
 
+  def test_what_it_must_do_is_followed_and_given_back(self) -> None:
+    #  the strict manner, a test's (SPEC.md 21.19 S2)
+    recorder = Recorder(answers={'use': SEEN})
+    outcome = Helper(recorder, self.said.append).must(
+      Action(Verb.USE, MCBlocks.Lever, LEVER))
+    self.assertTrue(outcome.done)
+    self.assertEqual([('use', (LEVER,), {})], recorder.asked)
+    self.assertEqual(['done: use MCBlocks.Lever at (5, 4, 7): ' + MET],
+                     self.said)
+
+  def test_what_it_must_do_and_cant_is_raised_once_said(self) -> None:
+    stopped = TesttimeError('take', None, 'no MCItems.PinkWool in the '
+                                          'container (it is empty)')
+    recorder = Recorder(stops={'take': stopped})
+    with self.assertRaises(TesttimeError) as raised:
+      Helper(recorder, self.said.append).must(
+        Action(Verb.TAKE, MCItems.PinkWool))
+    self.assertIs(stopped, raised.exception, 'the step\'s own error')
+    self.assertEqual(1, len(self.said))
+    self.assertTrue(self.said[0].startswith(
+      'not done: take MCItems.PinkWool: '))
+
+  def test_several_it_must_do_are_a_series(self) -> None:
+    recorder = Recorder(answers={'open': Container(slots=(WOOL,)),
+                                 'take': WOOL})
+    outcome = Helper(recorder, self.said.append).must(
+      Action(Verb.OPEN, MCBlocks.Chest, CHEST),
+      Action(Verb.TAKE, MCItems.PinkWool), Action(Verb.CLOSE))
+    self.assertEqual(['open', 'take', 'close'],
+                     [step for step, _, _ in recorder.asked])
+    self.assertEqual(3, len(outcome.instruction.steps))
+    self.assertEqual('done: 3 steps', self.said[-1])
+
+  def test_a_series_it_must_do_stops_at_the_step_it_cant(self) -> None:
+    stopped = TesttimeError('take', None, 'it is empty')
+    recorder = Recorder(answers={'open': Container(slots=())},
+                        stops={'take': stopped})
+    with self.assertRaises(TesttimeError) as raised:
+      Helper(recorder, self.said.append).must(
+        Action(Verb.OPEN, MCBlocks.Chest, CHEST),
+        Action(Verb.TAKE, MCItems.PinkWool), Action(Verb.CLOSE))
+    self.assertIs(stopped, raised.exception)
+    self.assertEqual(['open', 'take'],
+                     [step for step, _, _ in recorder.asked])
+
+  def test_it_must_do_something(self) -> None:
+    with self.assertRaises(TypeError):
+      Helper(Recorder(), self.said.append).must()
+    with self.assertRaises(TypeError):
+      Helper(Recorder(), self.said.append).must('close')
+
 
 if __name__ == '__main__':
   unittest.main()

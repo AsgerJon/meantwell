@@ -31,6 +31,22 @@ This robotic minecraft player tries to help you and follow your instructions.
   # done: 3 steps
   ```
 
+- **In a unitTAS test** a series of actions is written in short words, by the scene's own things, with no place
+  in numbers. `HelperTestCase` is a scenario's test case with a helper; what it plays is noted line by line under
+  the test's line in the report, and a step the robot can't complete is the test's error.
+
+  ```python
+  class ChestTests(HelperTestCase):
+
+    def test_the_wool_goes_in(self) -> None:
+      chest = self.scene.place(MCBlocks.Chest, at=(0, 0, 6))  # setup, by command
+      self.game.setSlot('main.0', MCItems.PinkWool)           # setup too
+      self.play(Verb.OPEN(chest), Verb.PUT(MCItems.PinkWool), Verb.CLOSE())
+      self.assertIn(MCItems.PinkWool, chest.contents())       # examined by command
+  ```
+
+  The same values are followed without a test: `Helper(agent, print).follow(Verb.OPEN(chest))`. Nothing of
+  meantwell but that one test case takes unitTAS's testing.
 - **Long trips:** `Traveller(agent).travel(place)` goes further than one look shows. It remembers the ground it was
   shown (`Atlas`), goes to the edge of it to look further, and so gets around a wall wider than a look and out of a
   dead end, where the agent's own `walkTo` stops. The helper's `go` is such a trip.
@@ -46,6 +62,8 @@ This robotic minecraft player tries to help you and follow your instructions.
     arrived on five trips of 40 to 82 blocks;
   - the swimmer came up from the bed of a pool three deep, stayed afloat and paddled out; swam it level under
     water from end to end at 0.17 blocks a tick, out at the bank, and through a gap one block high;
+  - a series written as above used a lever, put wool in a chest and took it out again, each step said in the
+    test's report;
   - the glider, from a tower 40 high, came to rest within 1.8 blocks of places 70 to 200 blocks off on flat
     ground, eight glides of eight, each softly. Its model of the flight stayed within 0.04 blocks of the game's
     over flights of up to 520 ticks.

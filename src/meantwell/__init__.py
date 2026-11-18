@@ -9,9 +9,14 @@ Being built: instructions and what follows them (SPEC.md 21.7 step 3),
 and maneuvering (SPEC.md 21.11).
 
 - instruction, action, examination, steps, when: what the helper can be
-  told, each a value; verb and question, their closed sets.
+  told, each a value; verb and question, their closed sets, each member
+  called with its parts the short word for its value; told, how the
+  parts are told apart.
 - outcome: what came of an instruction, done or not, and the line said.
-- helper: Helper, an agent and someone to tell, which follows them.
+- helper: Helper, an agent and someone to tell, which follows them, or
+  must do them.
+- helpertestcase: HelperTestCase, the front for unitTAS's tests, and
+  the one module here that takes anything of unitTAS's testing.
 - words: how things are said.
 - atlas: Atlas, what the agent remembers of the ground, look by look.
 - traveller: Traveller, long trips on what it remembers.

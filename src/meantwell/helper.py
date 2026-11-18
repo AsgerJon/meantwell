@@ -144,6 +144,41 @@ class Helper(BaseObject):
     self.__say__(outcome.said)
     return outcome
 
+  def must(self, *instructions: Instruction) -> Outcome:
+    """
+    Follows what it is given, as follow does, and holds it to be done:
+    the strict manner, a test's (SPEC.md 21.19 S2). Several instructions
+    are a series.
+
+    Parameters
+    ----------
+    *instructions : Instruction
+      One instruction, or the steps of a series.
+
+    Returns
+    -------
+    Outcome
+      Its outcome, done.
+
+    Raises
+    ------
+    TesttimeError
+      It wasn't done: the error of the agent's step that stopped it,
+      raised once every line has been said.
+    TypeError
+      Nothing to follow, or what follow refuses.
+    """
+    if not instructions:
+      raise TypeError('the helper must do an instruction or more, not '
+                      'none')
+    whole = instructions[0]
+    if len(instructions) > 1:
+      whole = Steps(instructions)
+    outcome = self.follow(whole)
+    if not outcome.done:
+      raise outcome.error
+    return outcome
+
   def _one(self, instruction: Instruction, how: Callable) -> Outcome:
     """One step of the agent's, by 'how': done, or not done and why."""
     try:
