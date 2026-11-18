@@ -22,3 +22,15 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Python's own, and what building the package leaves
+__pycache__/
+*.egg-info/
+/build/
+/dist/
+
+# the spec is local, as unitTAS's is (SPEC.md 21.6)
+/SPEC.md
+
+# scratch: copies and temporary files
+/tmp/

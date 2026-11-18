@@ -1,0 +1,23 @@
+#  Apache-2.0 license
+#  Copyright (c) 2026 Asger Jon Vistisen
+[build-system]
+requires = ["setuptools>=77"]  # 77: the license as an SPDX string
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meantwell"
+version = "0.1.0.dev0"
+description = "A robotic Minecraft player that tries to help you and follow your instructions, by a player's means"
+readme = "README.md"
+requires-python = ">=3.14"
+license = "Apache-2.0"
+authors = [{ name = "Asger Jon Vistisen" }]
+# what the package stands on (SPEC.md 21.6): unittas is its body (the game, the probe's protocol and, until the
+# lift-out, the agent's skills), installed from unitTAS's own tree (its python/ folder), not from an index
+dependencies = ["worktoy>=1.2.2", "mcdex>=0.2.0", "unittas>=0.1.0.dev0"]
+
+[project.urls]
+Homepage = "https://github.com/AsgerJon/meantwell"
+
+[tool.setuptools.packages.find]
+where = ["src"]
