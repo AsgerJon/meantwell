@@ -57,6 +57,10 @@ This robotic minecraft player tries to help you and follow your instructions.
 - **Gliding:** `Glider(body)` opens an elytra's wings (`takeOff`: one press of jump as it falls, or a forward jump
   first where it stands) and glides to a place (`glide`). It steers by its look alone, choosing its pitch by flying
   the game's own reckoning of an elytra ahead (`glide.py`), and comes down softly, sliding to rest at the place.
+- **A nether portal, cast:** `PortalCaster(agent).cast(origin, shore)` builds one beside a lake of lava with one
+  bucket, as a speedrunner does: a pillar of dirt, the water run from its top into trenches dug for it, lava poured
+  against the pillar into the falling water. It lights the portal and walks in. Its plan (`PortalCast`) is a row of
+  moves, each a value, played first in a world of blocks whose water runs by the game's own rule.
 - **In a real game** (26.3, the practice instance in `unittas.toml`), by a player's inputs alone:
   - on flat ground the traveller arrived each time where `walkTo` alone stopped, and across natural terrain it
     arrived on five trips of 40 to 82 blocks;
@@ -64,6 +68,8 @@ This robotic minecraft player tries to help you and follow your instructions.
     water from end to end at 0.17 blocks a tick, out at the bank, and through a gap one block high;
   - a series written as above used a lever, put wool in a chest and took it out again, each step said in the
     test's report;
+  - the caster, starting with a bucket of water, a flint and steel, a stack of dirt and an iron pickaxe, cast a
+    portal in 78 moves and 137 seconds and stood in it lit;
   - the glider, from a tower 40 high, came to rest within 1.8 blocks of places 70 to 200 blocks off on flat
     ground, eight glides of eight, each softly. Its model of the flight stayed within 0.04 blocks of the game's
     over flights of up to 520 ticks.

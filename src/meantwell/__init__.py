@@ -25,6 +25,9 @@ and maneuvering (SPEC.md 21.11).
 - swimmer: Swimmer, to a place as 1.13 swims, or upright at the top.
 - glide: how an elytra flies and comes down, as the game reckons it.
 - glider: Glider, which opens its wings and glides to a place.
+- castdoes, castmove, portalcast: the plan of a nether portal cast
+  beside a lake of lava with one bucket, each move a value.
+- portalcaster: PortalCaster, which plays that plan move by move.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen

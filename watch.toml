@@ -1,0 +1,11 @@
+#  Apache-2.0 license
+#  Copyright (c) 2026 Asger Jon Vistisen
+#  The practice instance (unittas.toml; SPEC.md 21.12) in a window large enough to watch: the same game and the same
+#  game folder, 1280 by 720. Its window is gamescope's own on the desktop, which shows without taking the focus.
+#  A run asks for it by name: 'unittas run --instance watch.toml tests.game.test_portal', or that line without
+#  'unittas run' as a request to meantwell's watcher.
+minecraft = "26.3"
+client = "real"
+probe = "bundled"
+game = "run/practice"
+window = { width = 1280, height = 720, display = "nested" }
