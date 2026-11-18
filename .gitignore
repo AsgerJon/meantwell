@@ -32,5 +32,10 @@ __pycache__/
 # the spec is local, as unitTAS's is (SPEC.md 21.6)
 /SPEC.md
 
+# what unittas makes as it runs: the practice game's folder, each run's results, meantwell's own watcher's queue
+/run/
+/unittas-results/
+/meantwell-queue/
+
 # scratch: copies and temporary files
 /tmp/

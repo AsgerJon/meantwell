@@ -1,0 +1,10 @@
+#  Apache-2.0 license
+#  Copyright (c) 2026 Asger Jon Vistisen
+#  The practice instance (SPEC.md 21.12): the game meantwell's own game tests run in, by 'unittas run' here or through
+#  meantwell's own watcher (meantwell_watch.py). The game as Mojang ships it: no loader and no mods, unittas's own
+#  probe beside it.
+minecraft = "26.3"
+client = "real"
+probe = "bundled"
+game = "run/practice"
+window = { width = 854, height = 480, display = "nested" }
