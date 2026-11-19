@@ -14,6 +14,8 @@ How fast it turns is reckoned each tick:
 It quickens by no more than QUICKEN a tick, never turns faster than
 FASTEST nor slower than SLOWEST (it doesn't creep up on the last
 degree), and never goes past: its last tick's rate is what is left.
+Within HAIR of its look the turn is at its end; 'look' then sets the
+look itself.
 Both ways turn together, so the look goes straight across the screen,
 the short way round. The same turn is turned the same way every time:
 nothing in it is random.
@@ -77,12 +79,17 @@ class Mouse(BaseObject):
   #  How much faster it may turn each tick, how fast at most and how
   #  slowly at least, in degrees a tick (15 is 300 a second)
   QUICKEN, FASTEST, SLOWEST = 6.0, 15.0, 1.0
-  #  A turn of no more than this, from rest, is the look set at once
-  SMALL = 3.0
+  #  A turn of no more than this, from rest, is the look set at once;
+  #  and within this of its look, 'look' sets it: it doesn't crawl up on
+  #  the last of a degree (found in the practice game: a rate asked each
+  #  tick turned two thirds of itself, and the last degree took 12 ticks)
+  SMALL, END = 3.0, 1.0
   #  The keys that walk it: with one held, 'look' sets the look outright
   WALKS = ('key.forward', 'key.back', 'key.left', 'key.right')
-  #  As near as two looks are counted the same, in degrees
-  SAME = 1e-9
+  #  A turn is at its end this near its look, in degrees: a game keeps
+  #  a look in single precision, and a turn smaller than that is none
+  #  (found in the practice game: a turn that never ended)
+  HAIR = 0.01
 
   #  Fallback Variables
 
@@ -155,8 +162,9 @@ class Mouse(BaseObject):
   def look(self, yaw: float, pitch: float) -> None:
     """
     Turns the body's look to 'yaw' and 'pitch': a rate each tick until
-    it is there, then the look itself, to the hair, with no rate left
-    in force. Looking there already, it asks nothing. A small turn from
+    it is within END of it, then the look itself, to the hair, with no
+    rate left in force. Looking there already, it asks nothing. A small
+    turn from
     rest is the look set at once; so is any turn with a walking key
     held.
 
@@ -176,7 +184,8 @@ class Mouse(BaseObject):
         self._set(yaw, pitch)
       return
     while not self.toward(yaw, pitch):
-      pass
+      if self._off(self.__at__, yaw, pitch)[2] <= self.END:
+        break
     if self._off(self.__at__, yaw, pitch)[2] > 0.0:
       self._set(yaw, pitch)
 
@@ -255,7 +264,7 @@ class Mouse(BaseObject):
     """
     leftYaw, leftPitch, left = self._off(self._turned(at, rate), yaw,
                                          pitch)
-    if left <= self.SAME:
+    if left <= self.HAIR:
       return (0.0, 0.0), True
     #  along the straight line from where it looks to where it is to;
     #  of how fast it turns already, what goes that way is kept

@@ -175,11 +175,12 @@ class MouseTests(unittest.TestCase):
         mouse = Mouse(parts)
         while not mouse.toward(yaw, pitch):
           self.assertLess(len(parts.track), 40)
-        for one, other in zip(whole.track, parts.track):
+        #  but for its last tick, where 'look' sets the look itself
+        for one, other in zip(whole.track[:-1], parts.track):
           self.assertAlmostEqual(one[0], other[0], places=9)
           self.assertAlmostEqual(one[1], other[1], places=9)
-        self.assertAlmostEqual(yaw, parts.yaw, places=9)
-        self.assertAlmostEqual(pitch, parts.pitch, places=9)
+        self.assertAlmostEqual(yaw, parts.yaw, delta=Mouse.HAIR)
+        self.assertAlmostEqual(pitch, parts.pitch, delta=Mouse.HAIR)
         self.assertEqual((0.0, 0.0), parts.rate)
 
   def test_toward_there_already_says_so_and_is_still_a_tick(self) -> None:
@@ -269,6 +270,41 @@ class MouseTests(unittest.TestCase):
     mouse.toward(170.0, 0.0)
     self.assertAlmostEqual(Mouse.FASTEST, body.rates[0][0],
                            msg='10 already, and no more than 6 faster')
+
+  def test_a_turn_ends_on_a_look_kept_as_a_game_keeps_it(self) -> None:
+    #  found in the game (2026-11-19): a game's look is in single
+    #  precision; what was left of a turn was too small to turn it, was
+    #  asked for again and again, and the turn never ended
+    for yaw, pitch in ((90.0, 0.0), (33.7, 52.6), (-126.9, 47.3),
+                       (0.1, 71.3), (179.9, -89.0)):
+      with self.subTest(yaw=yaw, pitch=pitch):
+        body = LookBody(single=True)
+        Mouse(body).look(yaw, pitch)
+        self.assertAlmostEqual(yaw, body.yaw, places=4)
+        self.assertAlmostEqual(pitch, body.pitch, places=4)
+        self.assertEqual((0.0, 0.0), body.rate)
+        self.assertLess(body.tick, 60)
+        mouse = Mouse(LookBody(12.3, 4.5, single=True))
+        turns = 0
+        while not mouse.toward(yaw, pitch):
+          turns += 1
+          self.assertLess(turns, 60)
+        self.assertLess(abs(mouse.bearing.look.pitch - pitch), Mouse.HAIR)
+
+  def test_a_turn_doesnt_crawl_to_its_end(self) -> None:
+    #  found in the game (2026-11-19): a rate asked each tick turned two
+    #  thirds of itself, so asking what was left got two thirds of it,
+    #  tick after tick: 12 ticks for the last degree of a quarter turn.
+    #  Within END of its look, 'look' sets it
+    for lost, most in ((0.0, 16), (0.35, 26)):
+      with self.subTest(lost=lost):
+        body = LookBody(single=True, lost=lost)
+        Mouse(body).look(90.0, 30.0)
+        self.assertEqual((90.0, 30.0), body.looks[-1])
+        self.assertLessEqual(body.tick, most)
+        before = body.track[-2]
+        self.assertLessEqual(math.hypot(90.0 - before[0], 30.0 - before[1]),
+                             Mouse.END + 1e-6, 'set from within END only')
 
   def test_toward_refuses_a_look_no_head_can_take(self) -> None:
     body = LookBody()

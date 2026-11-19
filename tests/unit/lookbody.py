@@ -11,6 +11,7 @@ after, and is answered with the bearing as it is before it acts.
 #  Copyright (c) 2026 Asger Jon Vistisen
 from __future__ import annotations
 
+import struct
 from typing import Any
 
 from unittas.bearing import Bearing
@@ -22,10 +23,18 @@ from unittas.values import Look, Vec3
 class LookBody:
   """The body, looking 'yaw' and 'pitch' to begin with. 'track' holds
   its look at each tick's end, 'looks' each look set outright, 'rates'
-  each rate asked, 'asked' each request: (name, arguments)."""
+  each rate asked, 'asked' each request: (name, arguments). 'single':
+  its look is kept as a game keeps it, in single precision, so that a
+  turn too small for it is no turn. 'lost': the share of a tick's turn
+  that is lost in a tick a rate is asked in (measured in the practice
+  game on unittas 0.1.0.dev23: a third and more). It plays 2000 ticks
+  and no more."""
 
-  def __init__(self, yaw: float = 0.0, pitch: float = 0.0) -> None:
+  def __init__(self, yaw: float = 0.0, pitch: float = 0.0,
+               single: bool = False, lost: float = 0.0) -> None:
     self.yaw, self.pitch = yaw, pitch
+    self.single = single
+    self.lost = lost
     self.rate = 0.0, 0.0
     self.track = []
     self.looks = []
@@ -34,11 +43,17 @@ class LookBody:
     self.tick = 0
     self.reach = 4.5
 
-  def _tick(self) -> None:
-    """A tick of the game: the look turned by the rate in force."""
+  def _tick(self, kept: float = 1.0) -> None:
+    """A tick of the game: the look turned by the rate in force, or by
+    the share 'kept' of it."""
     self.tick += 1
-    self.yaw = (self.yaw + self.rate[0] + 180.0) % 360.0 - 180.0
-    self.pitch = min(max(self.pitch + self.rate[1], -90.0), 90.0)
+    if self.tick > 2000:
+      raise RuntimeError('2000 ticks: whoever plays this body never ends')
+    self.yaw = (self.yaw + self.rate[0] * kept + 180.0) % 360.0 - 180.0
+    self.pitch = min(max(self.pitch + self.rate[1] * kept, -90.0), 90.0)
+    if self.single:
+      self.yaw, self.pitch = struct.unpack('ff', struct.pack(
+        'ff', self.yaw, self.pitch))
     self.track.append((self.yaw, self.pitch))
 
   def look(self, yaw: float, pitch: float) -> None:
@@ -51,7 +66,7 @@ class LookBody:
 
   def mouseRate(self, yaw: float, pitch: float) -> Bearing:
     self.asked.append(('mouseRate', (yaw, pitch)))
-    self._tick()
+    self._tick(1.0 - self.lost)
     self.rate = float(yaw), float(pitch)
     self.rates.append(self.rate)
     return Bearing(tick=self.tick, pos=Vec3(0.0, 0.0, 0.0),

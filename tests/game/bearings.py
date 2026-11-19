@@ -14,12 +14,14 @@ from typing import Any
 class Bearings:
   """
   The game's own members, passed on as they are. 'kept' holds each
-  bearing a mouseRate was answered with, in turn.
+  bearing a mouseRate was answered with, in turn, and 'rates' the rate
+  each was asked with: (yaw, pitch).
   """
 
   def __init__(self, game: Any) -> None:
     self.game = game
     self.kept = []
+    self.rates = []
 
   def __getattr__(self, name: str) -> Any:
     if name.startswith('__'):
@@ -29,6 +31,7 @@ class Bearings:
   def mouseRate(self, yaw: float, pitch: float) -> Any:
     bearing = self.game.mouseRate(yaw, pitch)
     self.kept.append(bearing)
+    self.rates.append((yaw, pitch))
     return bearing
 
   def turn(self) -> float:
