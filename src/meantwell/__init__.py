@@ -28,6 +28,8 @@ and maneuvering (SPEC.md 21.11).
 - castdoes, castmove, portalcast: the plan of a nether portal cast
   beside a lake of lava with one bucket, each move a value.
 - portalcaster: PortalCaster, which plays that plan move by move.
+- lakecast: LakeCast, the plan of a portal cast in a lake's own edge
+  with a mold of seven blocks, as a speedrunner's beginner casts it.
 - mouse: Mouse, a body whose look is turned as a hand turns a mouse.
 - pace: how a player walks on the ground, as the game reckons it.
 - walker: Walker, which walks a way as a player does, turned by the

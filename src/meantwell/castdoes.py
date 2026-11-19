@@ -25,6 +25,13 @@ class CastDoes(KeeNum):
   SCOOP_WATER = Kee[str]('scoop the water at')
   #  goes to the lake and takes a lava source up in its empty bucket
   FETCH_LAVA = Kee[str]('fetch lava from the lake')
+  #  takes a lava source up in its empty bucket, from where it stands
+  SCOOP_LAVA = Kee[str]('scoop the lava at')
+  #  jumps, and puts a block under its own feet
+  PILLAR = Kee[str]('put a block under its feet')
+  #  sneaks to the edge of what it stands on, towards a side, so that it
+  #  sees the side of the block under it
+  LEAN = Kee[str]('lean over')
   #  strikes its flint and steel on a block's face
   LIGHT = Kee[str]('light')
   #  walks into the portal and stands in it

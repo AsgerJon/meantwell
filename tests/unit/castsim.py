@@ -44,7 +44,9 @@ SIDES = ((1, 0, 0), (-1, 0, 0), (0, 0, 1), (0, 0, -1))
 SOLID = ('ground', 'dirt', 'obsidian')
 #  How long each move takes, in ticks, near enough
 TAKES = {CastDoes.STAND: 40, CastDoes.DIG: 20, CastDoes.FETCH_LAVA: 120,
-         CastDoes.ENTER: 40}
+         CastDoes.ENTER: 40, CastDoes.PILLAR: 12, CastDoes.LEAN: 10}
+#  How far past the edge of what it stands on a lean takes its middle
+LEANS = 0.25
 #  How far from where it is to stand the robot may stand, each way
 OFF = ((0.0, 0.0), (0.25, 0.0), (-0.25, 0.0), (0.0, 0.25), (0.0, -0.25))
 
@@ -65,8 +67,14 @@ class CastSim:
   YARD = 2
 
   def __init__(self, ground: int, lake: tuple, start: Vec3, frame: tuple,
-               interior: tuple, shore: Vec3, dirt: int = 64) -> None:
+               interior: tuple, shore: Vec3, dirt: int = 64,
+               crusts: tuple = (), wades: bool = False) -> None:
     self.ground = ground
+    #  the lake's cells the cast means to turn to obsidian, and whether
+    #  it may stand in water that runs (a cast in the lake's own edge)
+    self.crusts = set(self._key(cell) for cell in crusts)
+    self.wades = wades
+    self.leans = None
     self.blocks = {self._key(cell): 'lava' for cell in lake}
     self.lake = set(self.blocks)
     self.dug = set(self.lake)
@@ -222,6 +230,8 @@ class CastSim:
        CastDoes.DIRT: self._click, CastDoes.POUR_WATER: self._click,
        CastDoes.POUR_LAVA: self._click, CastDoes.LIGHT: self._click,
        CastDoes.SCOOP_WATER: self._scoop,
+       CastDoes.SCOOP_LAVA: self._scoopLava,
+       CastDoes.PILLAR: self._pillar, CastDoes.LEAN: self._lean,
        CastDoes.FETCH_LAVA: self._fetch,
        CastDoes.ENTER: self._enter}[move.does](move)
       self.tick += TAKES.get(move.does, 8)
@@ -236,17 +246,33 @@ class CastSim:
     self.faults.append('%s: %s' % (move, why))
 
   def _eyes(self) -> list:
-    """Its eye, where it is to stand and a quarter block each way."""
+    """Its eye, where it is to stand and a quarter block each way;
+    leaning over an edge, where the edge holds it and nowhere else."""
+    if self.leans is not None:
+      return [(self.pos.x, self.pos.y + self.EYE, self.pos.z)]
     return [(self.pos.x + dx, self.pos.y + self.EYE, self.pos.z + dz)
             for dx, dz in OFF]
+
+  def _body(self) -> set:
+    """The cells its own body is in: two high, and every column its
+    box touches (0.3 each way from its middle)."""
+    feet = math.floor(self.pos.y)
+    return {(x, y, z)
+            for x in {math.floor(self.pos.x - 0.3),
+                      math.floor(self.pos.x + 0.3)}
+            for z in {math.floor(self.pos.z - 0.3),
+                      math.floor(self.pos.z + 0.3)}
+            for y in (feet, feet + 1)}
 
   def _settle(self, move: CastMove) -> None:
     """Lava that no water came to, runs; and water has run off when it
     lies on the ground further than YARD from the frame, or reached the
     lake."""
-    if self.crusted:
+    if self.crusted - self.crusts:
       self._fault(move, 'the water reached the lake: %d of its cells are '
-                        'obsidian' % len(self.crusted))
+                        'obsidian that weren\'t meant to be, %r' % (
+                          len(self.crusted - self.crusts),
+                          sorted(self.crusted - self.crusts)))
     far = [cell for cell in self.water
            if cell[1] == self.ground + 1 and self.frame and min(
              max(abs(cell[0] - each[0]), abs(cell[2] - each[2]))
@@ -274,9 +300,48 @@ class CastSim:
       return self._fault(move, 'nowhere to stand there: %s on %s under %s'
                          % (self.kind(cell), self.kind(below),
                             self.kind(above)))
-    if cell in self.water:
+    if cell in self.water and not self.wades:
       return self._fault(move, 'it would stand in water')
     self.pos = spot
+    self.leans = None
+    return None
+
+  def _lean(self, move: CastMove) -> None:
+    """To the edge of the block it stands on, towards a side, and
+    LEANS past it: sneaking, the edge holds it there."""
+    if self.leans is not None:
+      return self._fault(move, 'it leans already')
+    normal = NORMALS[move.face]
+    cell = (math.floor(self.pos.x), math.floor(self.pos.y),
+            math.floor(self.pos.z))
+    over = tuple(cell[i] + normal[i] for i in range(3))
+    if not self.solid((cell[0], cell[1] - 1, cell[2])):
+      return self._fault(move, 'nothing under it to lean from')
+    if self.solid(over) or self.solid((over[0], over[1] + 1, over[2])):
+      return self._fault(move, 'no room to lean: %s is at %r' % (
+        self.kind(over), over))
+    if self.solid((over[0], over[1] - 1, over[2])):
+      return self._fault(move, 'no edge to lean over: there is a floor '
+                               'at %r' % ((over[0], over[1] - 1, over[2]),))
+    self.pos = Vec3(cell[0] + 0.5 + normal[0] * (0.5 + LEANS), self.pos.y,
+                    cell[2] + 0.5 + normal[2] * (0.5 + LEANS))
+    self.leans = move.face
+    return None
+
+  def _pillar(self, move: CastMove) -> None:
+    """A jump, and a block put under its feet."""
+    if self.leans is not None:
+      return self._fault(move, 'it leans over an edge')
+    if self.dirt < 1:
+      return self._fault(move, 'no dirt left')
+    cell = (math.floor(self.pos.x), math.floor(self.pos.y),
+            math.floor(self.pos.z))
+    if not all(self.free((cell[0], cell[1] + up, cell[2]))
+               for up in (0, 1, 2)):
+      return self._fault(move, 'no room over it to jump')
+    self.dirt -= 1
+    self.blocks[cell] = 'dirt'
+    self.pos = Vec3(self.pos.x, self.pos.y + 1.0, self.pos.z)
     return None
 
   def _sight(self, eye: tuple, point: tuple,
@@ -330,13 +395,20 @@ class CastSim:
     does = move.does
     if does is CastDoes.LIGHT:
       return self._light(move)
-    if not self.free(into):
+    if into in self._body():
+      return self._fault(move, 'it stands there itself, at %r' % (into,))
+    #  a block, and water, take the place of lava; lava doesn't
+    room = self.free(into) or (does is not CastDoes.POUR_LAVA and
+                               self.kind(into) == 'lava')
+    if not room:
       return self._fault(move, 'no room: %s is at %r' % (
         self.kind(into), into))
     if does is CastDoes.DIRT:
       if self.dirt < 1:
         return self._fault(move, 'no dirt left')
       self.dirt -= 1
+      self.sources.discard(into)
+      self.water.pop(into, None)
       self.blocks[into] = 'dirt'
       return None
     holds = 'water' if does is CastDoes.POUR_WATER else 'lava'
@@ -346,6 +418,7 @@ class CastSim:
     if does is CastDoes.POUR_WATER:
       if into in self.sources:
         return self._fault(move, 'water is there already')
+      self.blocks.pop(into, None)
       self.sources.add(into)
       self.water[into] = 8
       return None
@@ -393,6 +466,30 @@ class CastSim:
     self.sources.discard(cell)
     del self.water[cell]
     self.bucket = 'water'
+    return None
+
+  def _scoopLava(self, move: CastMove) -> None:
+    """A lava source taken up from where it stands: the first source
+    its ray meets, aimed at the top of the lava's cell."""
+    cell = self._key(move.pos)
+    if self.bucket != 'nothing':
+      return self._fault(move, 'the bucket holds %s' % self.bucket)
+    if self.kind(cell) != 'lava':
+      return self._fault(move, 'no lava there: %s' % (self.kind(cell),))
+    point = (cell[0] + 0.5, cell[1] + 0.9, cell[2] + 0.5)
+    for eye in self._eyes():
+      if math.dist(eye, point) > self.REACH:
+        return self._fault(move, 'out of reach: %.2f blocks from %r' % (
+          math.dist(eye, point), eye))
+      met = None
+      for met in self._sight(eye, point, cell):
+        if met in self.sources or self.kind(met) == 'lava':
+          break
+      if met != cell:
+        return self._fault(move, 'from %r the ray meets %s at %r first' % (
+          eye, 'water' if met in self.sources else self.kind(met), met))
+    del self.blocks[cell]
+    self.bucket = 'lava'
     return None
 
   def _dig(self, move: CastMove) -> None:

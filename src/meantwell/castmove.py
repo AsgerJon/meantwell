@@ -18,10 +18,12 @@ from .words import where
 #  The faces of a block, as the crosshair's target names them
 FACES = ('up', 'down', 'north', 'south', 'east', 'west')
 #  What each kind of move is told: a block, a face of it, a spot
-_BLOCK = (CastDoes.DIG, CastDoes.SCOOP_WATER)
+_BLOCK = (CastDoes.DIG, CastDoes.SCOOP_WATER, CastDoes.SCOOP_LAVA)
 _FACE = (CastDoes.DIRT, CastDoes.POUR_WATER, CastDoes.POUR_LAVA,
          CastDoes.LIGHT)
 _SPOT = (CastDoes.STAND, CastDoes.ENTER)
+#  The sides it can lean over: a block's four, not its top or bottom
+SIDES = ('north', 'south', 'east', 'west')
 
 
 class CastMove(EZData, frozen=True):
@@ -55,12 +57,17 @@ class CastMove(EZData, frozen=True):
     if block != isinstance(self.pos, BlockPos):
       raise self._refused('names %s, not %r' % (
         'a block by a BlockPos' if block else 'no block', self.pos))
-    if (does in _FACE) != bool(self.face):
+    faced = does in _FACE or does is CastDoes.LEAN
+    if faced != bool(self.face):
       raise self._refused('names %s, not %r' % (
-        'a face of its block' if does in _FACE else 'no face', self.face))
+        'a face of its block' if does in _FACE else
+        'a side to lean over' if faced else 'no face', self.face))
     if self.face and self.face not in FACES:
       raise ValueError('a block\'s faces are %s, not %r' % (
         ', '.join(FACES), self.face))
+    if does is CastDoes.LEAN and self.face not in SIDES:
+      raise ValueError('it leans over a side, %s, not %r' % (
+        ', '.join(SIDES), self.face))
     if (does in _SPOT) != isinstance(self.spot, Vec3):
       raise self._refused('names %s, not %r' % (
         'a spot by a Vec3' if does in _SPOT else 'no spot', self.spot))
@@ -70,8 +77,11 @@ class CastMove(EZData, frozen=True):
     does = self.does
     if does in _SPOT:
       return '%s %s' % (does.value, where(self.spot))
-    if does is CastDoes.SCOOP_WATER:
+    if does in (CastDoes.SCOOP_WATER, CastDoes.SCOOP_LAVA):
       return '%s %s' % (does.value, where(self.pos))
+    if does is CastDoes.LEAN:
+      return '%s the %s edge of what it stands on' % (does.value,
+                                                      self.face)
     if does is CastDoes.DIG:
       return 'dig the block at %s' % where(self.pos)
     if does in _FACE:
