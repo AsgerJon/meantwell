@@ -78,7 +78,9 @@ class HandsTests(ScenarioTestCase):
       before = self.agent.perceive().tick
       hand.look(*aims[(use + 1) // 2 % 2])
       between = self.agent.perceive().tick
-      self.game.tap('key.use')
+      #  a press as two requests, down and up: a tick less than a tap
+      self.game.keyDown('key.use')
+      self.game.keyUp('key.use')
       presses.append(self.agent.perceive().tick - between - 1)
       looks.append(between - before - 1)
     self.agent.wait(10)

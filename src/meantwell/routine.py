@@ -92,6 +92,18 @@ class Routine(BaseObject):
     """Whether it holds the key down."""
     return key in self.__held__
 
+  def press(self, key: str) -> None:
+    """
+    One press of the key: down, and up again, two requests. A tick less
+    than the body's own tap takes in the game (SPEC.md 21.24). A key it
+    holds is let go first, so that the press is one.
+    """
+    if key in self.__held__:
+      self.__body__.keyUp(key)
+      self.__held__.discard(key)
+    self.__body__.keyDown(key)
+    self.__body__.keyUp(key)
+
   def _see(self) -> Perception:
     """What the body perceives now: itself, no blocks around it."""
     seen = self.__body__.perceive(*self.LOOK)
