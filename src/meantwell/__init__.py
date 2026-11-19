@@ -28,6 +28,10 @@ and maneuvering (SPEC.md 21.11).
 - castdoes, castmove, portalcast: the plan of a nether portal cast
   beside a lake of lava with one bucket, each move a value.
 - portalcaster: PortalCaster, which plays that plan move by move.
+- mouse: Mouse, a body whose look is turned as a hand turns a mouse.
+- pace: how a player walks on the ground, as the game reckons it.
+- walker: Walker, which walks a way as a player does, turned by the
+  mouse.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen

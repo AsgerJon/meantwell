@@ -7,6 +7,11 @@ asked for to the hair. Both ways turn together, the short way round. A
 small turn is one look. The same turn is turned the same way each time.
 With a walking key held the look is set outright. Everything else of
 the body it hands on untouched.
+
+And 'toward' (SPEC.md 21.23): one request's part of that turn, for the
+one who turns while it walks. Asked again and again it is the same turn;
+it follows a look that moves, goes on from how fast it turns already,
+and is never set outright, a walking key held or not.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -138,6 +143,88 @@ class MouseTests(unittest.TestCase):
     self.assertIs(body, mouse.body)
     with self.assertRaises(AttributeError):
       mouse.flap()
+
+  def test_toward_is_one_request_a_part_of_the_way(self) -> None:
+    body = LookBody()
+    mouse = Mouse(body)
+    self.assertFalse(mouse.toward(90.0, 0.0), 'not there yet')
+    self.assertEqual(1, len(body.looks))
+    self.assertFalse(mouse.toward(90.0, 0.0))
+    self.assertEqual(2, len(body.looks))
+    first, second = _steps(body)
+    self.assertAlmostEqual(Mouse.QUICKEN, first)
+    self.assertAlmostEqual(2 * Mouse.QUICKEN, second, msg='it goes on '
+                           'from how fast it turns already')
+
+  def test_toward_asked_until_there_is_the_turn_look_makes(self) -> None:
+    for yaw, pitch in ((90.0, 0.0), (-170.0, 40.0), (12.0, -60.0),
+                       (2.0, 1.0)):
+      with self.subTest(yaw=yaw, pitch=pitch):
+        whole, parts = LookBody(), LookBody()
+        Mouse(whole).look(yaw, pitch)
+        mouse = Mouse(parts)
+        while not mouse.toward(yaw, pitch):
+          self.assertLess(len(parts.looks), 20)
+        self.assertEqual(len(whole.looks), len(parts.looks))
+        for one, other in zip(whole.looks, parts.looks):
+          self.assertAlmostEqual(one[0], other[0], places=9)
+          self.assertAlmostEqual(one[1], other[1], places=9)
+        self.assertEqual((yaw, pitch), parts.looks[-1])
+
+  def test_toward_there_already_asks_nothing_and_says_so(self) -> None:
+    body = LookBody(40.0, 5.0)
+    mouse = Mouse(body)
+    self.assertTrue(mouse.toward(40.0, 5.0))
+    self.assertEqual([], body.looks)
+
+  def test_toward_follows_a_look_that_moves(self) -> None:
+    #  where it is to look moves on each request, as a walker's does
+    body = LookBody()
+    mouse = Mouse(body)
+    wanted = [30.0 + 4.0 * at for at in range(30)]
+    for yaw in wanted:
+      mouse.toward(yaw, 0.0)
+      self.assertLessEqual(body.yaw, yaw + 1e-9, 'never past it')
+    steps = _steps(body)
+    self.assertLessEqual(max(steps), Mouse.FASTEST + 1e-9)
+    for before, after in zip([0.0] + steps, steps):
+      self.assertLessEqual(after - before, Mouse.QUICKEN + 1e-9)
+    self.assertLess(wanted[-1] - body.yaw, 4.0 + 1e-9, 'it keeps up')
+
+  def test_toward_turned_back_begins_from_rest(self) -> None:
+    body = LookBody()
+    mouse = Mouse(body)
+    for _ in range(3):
+      mouse.toward(170.0, 0.0)
+    self.assertAlmostEqual(Mouse.FASTEST, _steps(body)[-1])
+    mouse.toward(-90.0, 0.0)
+    self.assertAlmostEqual(Mouse.QUICKEN, _steps(body)[-1])
+    self.assertLess(body.looks[-1][0], body.looks[-2][0], 'back it goes')
+
+  def test_toward_turns_with_a_walking_key_held(self) -> None:
+    body = LookBody()
+    mouse = Mouse(body)
+    mouse.keyDown('key.forward')
+    self.assertFalse(mouse.toward(90.0, 0.0))
+    self.assertEqual([(Mouse.QUICKEN, 0.0)], body.looks)
+
+  def test_look_after_toward_begins_from_rest(self) -> None:
+    body = LookBody()
+    mouse = Mouse(body)
+    for _ in range(3):
+      mouse.toward(170.0, 0.0)
+    before = len(body.looks)
+    mouse.look(-90.0, 0.0)
+    self.assertAlmostEqual(Mouse.QUICKEN, _steps(body)[before])
+    self.assertEqual((-90.0, 0.0), body.looks[-1])
+
+  def test_toward_refuses_a_look_no_head_can_take(self) -> None:
+    body = LookBody()
+    with self.assertRaises(ValueError):
+      Mouse(body).toward(0.0, -91.0)
+    with self.assertRaises(TypeError):
+      Mouse(body).toward(0.0, None)
+    self.assertEqual([], body.asked)
 
 
 if __name__ == '__main__':

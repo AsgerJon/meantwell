@@ -24,9 +24,13 @@ Two things it isn't yet, both found in the practice game (SPEC.md
 21.22). A request for a look takes two ticks, so a turn is a row of
 some ten small jumps a second, not a hand's one movement: that needs
 the probe to turn the look at every frame, which is asked of unitTAS.
-And while a walking key is held it sets the look outright, as the body
-does: the agent's walk counts on its look being there at once, and
+And while a walking key is held 'look' sets the look outright, as the
+body does: the agent's walk counts on its look being there at once, and
 walked in rings round a waypoint when it wasn't.
+
+'toward' is one request of a turn, for a walk that knows it turns (the
+walker, SPEC.md 21.23): asked again and again with where to look then,
+it turns as 'look' does and is never set outright.
 """
 #  Apache-2.0 license
 #  Copyright (c) 2026 Asger Jon Vistisen
@@ -44,11 +48,13 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class Mouse(BaseObject):
   """
-  The mouse of one body. 'look' is a turn; every other member is the
-  body's own.
+  The mouse of one body. 'look' is a turn and 'toward' one request of
+  one; every other member is the body's own.
 
     agent = Agent(Mouse(game), frames)   # every step of it turns so
     Mouse(body).look(90.0, 0.0)          # some eight looks, then there
+    while not mouse.toward(yaw, 0.0):    # a request at a time, walking
+      yaw = ...
   """
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -76,6 +82,8 @@ class Mouse(BaseObject):
   __walking__: set = None
   #  Where it left the look, once it has turned it: (yaw, pitch)
   __at__: tuple = None
+  #  How far its last request turned it: (yaw, pitch), in degrees
+  __rate__: tuple = (0.0, 0.0)
 
   #  Public Variables
   body = Field()
@@ -130,9 +138,9 @@ class Mouse(BaseObject):
     Turns the body's look to 'yaw' and 'pitch': a part of the way each
     request, the last one the look itself. Looking there already, it
     asks nothing. With a walking key held, the look is set outright. It
-    turns from where it left the look last (the first time, from where
-    the body perceives it looks): a look turned by anything else is
-    found again by its last request, which is the look itself.
+    turns from rest, from where it left the look last (the first time,
+    from where the body perceives it looks): a look turned by anything
+    else is found again by its last request, which is the look itself.
 
     Raises
     ------
@@ -141,42 +149,78 @@ class Mouse(BaseObject):
     ValueError
       A pitch beyond straight up or straight down.
     """
+    self._checked(yaw, pitch)
+    self.__rate__ = 0.0, 0.0
+    if self.__walking__:
+      if self._left(yaw, pitch)[2] > 0.0:
+        self.__body__.look(yaw, pitch)
+      self.__at__ = float(yaw), float(pitch)
+      return
+    while not self.toward(yaw, pitch):
+      pass
+
+  def toward(self, yaw: float, pitch: float) -> bool:
+    """
+    One request's turn towards 'yaw' and 'pitch': a part of the way, as
+    'look' turns, going on from how fast it turns that way already.
+    Whether it looks there now; looking there already it asks nothing.
+    It is for the one who turns while it does something else, a walker:
+    asked again and again, each time with where it is to look then. It
+    is never set outright, a walking key held or not.
+
+    Raises
+    ------
+    TypeError
+      A look that isn't two numbers.
+    ValueError
+      A pitch beyond straight up or straight down.
+    """
+    self._checked(yaw, pitch)
+    leftYaw, leftPitch, left = self._left(yaw, pitch)
+    if left == 0.0:
+      self.__rate__ = 0.0, 0.0
+      return True
+    atYaw, atPitch = self.__at__
+    #  along the straight line from where it looks to where it is to;
+    #  of how fast it turns already, what goes that way is kept
+    wayYaw, wayPitch = leftYaw / left, leftPitch / left
+    speed = max(0.0, self.__rate__[0] * wayYaw +
+                self.__rate__[1] * wayPitch)
+    want = self.KP * left - self.KD * speed
+    speed = min(max(want, self.SLOWEST), speed + self.QUICKEN,
+                self.FASTEST)
+    if left <= self.SMALL or speed >= left:
+      #  the last of it: the look itself, to the hair
+      self.__body__.look(yaw, pitch)
+      self.__at__ = float(yaw), float(pitch)
+      self.__rate__ = leftYaw, leftPitch
+      return True
+    self.__at__ = (self._wrapped(atYaw + wayYaw * speed),
+                   atPitch + wayPitch * speed)
+    self.__rate__ = wayYaw * speed, wayPitch * speed
+    self.__body__.look(*self.__at__)
+    return False
+
+  @staticmethod
+  def _checked(yaw: float, pitch: float) -> None:
+    """Raises unless that is a look a head can take."""
     for each in (yaw, pitch):
       if isinstance(each, bool) or not isinstance(each, (int, float)):
         raise TypeError('a look is its yaw and its pitch in degrees, not '
                         '%r' % (each,))
     if not -90.0 <= pitch <= 90.0:
       raise ValueError('a pitch is from -90 to 90, not %r' % (pitch,))
-    body = self.__body__
+
+  def _left(self, yaw: float, pitch: float) -> tuple:
+    """How far it is from where it left the look to 'yaw' and 'pitch':
+    (the yaw's way, the short way round; the pitch's; both together).
+    The first time, where it left the look is where the body looks."""
     if self.__at__ is None:
-      now = body.perceive(0, 0, 0).look
+      now = self.__body__.perceive(0, 0, 0).look
       self.__at__ = now.yaw, now.pitch
-    atYaw, atPitch = self.__at__
-    self.__at__ = float(yaw), float(pitch)
-    leftYaw = (yaw - atYaw + 180.0) % 360.0 - 180.0
-    leftPitch = pitch - atPitch
-    left = math.hypot(leftYaw, leftPitch)
-    if left == 0.0:
-      return
-    if left <= self.SMALL or self.__walking__:
-      body.look(yaw, pitch)
-      return
-    #  along the straight line from where it looks to where it is to
-    wayYaw, wayPitch = leftYaw / left, leftPitch / left
-    speed, summed, gone = 0.0, 0.0, 0.0
-    while True:
-      still = left - gone
-      summed += still
-      want = self.KP * still + self.KI * summed - self.KD * speed
-      speed = min(max(want, self.SLOWEST), speed + self.QUICKEN,
-                  self.FASTEST)
-      if speed >= still:
-        break
-      gone += speed
-      body.look(self._wrapped(atYaw + wayYaw * gone),
-                atPitch + wayPitch * gone)
-    #  the last of it: the look itself, to the hair
-    body.look(yaw, pitch)
+    leftYaw = (yaw - self.__at__[0] + 180.0) % 360.0 - 180.0
+    leftPitch = pitch - self.__at__[1]
+    return leftYaw, leftPitch, math.hypot(leftYaw, leftPitch)
 
   @staticmethod
   def _wrapped(yaw: float) -> float:

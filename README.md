@@ -61,6 +61,13 @@ This robotic minecraft player tries to help you and follow your instructions.
   bucket, as a speedrunner does: a pillar of dirt, the water run from its top into trenches dug for it, lava poured
   against the pillar into the falling water. It lights the portal and walks in. Its plan (`PortalCast`) is a row of
   moves, each a value, played first in a world of blocks whose water runs by the game's own rule.
+- **A walk as a player walks:** `Walker(Mouse(body)).walk(place)` goes the way the agent's `walkTo` finds, and
+  walks it as a hand and feet do. It steers at a point ahead on the way, so a turn begins before its corner and the
+  track is a curve. Its head is turned by the mouse a part at a time (`Mouse.toward`), never set in one jump. Its
+  feet go only where it looks, and only while the next ticks keep it on the way's ground. It stops by letting go
+  where its own motion carries it there. Tested without a game so far, on a body that moves as the ground has it:
+  where `walkTo`'s look jumps 90 to 177 degrees and its walk ends sneaking, the walker's look turns 30 degrees a
+  request at most and it never sneaks.
 - **In a real game** (26.3, the practice instance in `unittas.toml`), by a player's inputs alone:
   - on flat ground the traveller arrived each time where `walkTo` alone stopped, and across natural terrain it
     arrived on five trips of 40 to 82 blocks;
@@ -73,9 +80,12 @@ This robotic minecraft player tries to help you and follow your instructions.
   - the glider, from a tower 40 high, came to rest within 1.8 blocks of places 70 to 200 blocks off on flat
     ground, eight glides of eight, each softly. Its model of the flight stayed within 0.04 blocks of the game's
     over flights of up to 520 ticks.
-- **Not yet:** the traveller swimming water it can't see across (it goes round, or says there is no way); a thing
-  found by looking; a whole task as one instruction; instructions typed in a terminal; rockets, and a glide to
-  ground that isn't flat.
+- **Not yet:** its look turned at every frame (a request for a look takes two ticks, so a turn is still ten small
+  jumps a second: the frame-by-frame turn is asked of unitTAS); the walker in a game, and under the caster and
+  the traveller, which still walk by `walkTo`; a jump, a drop, a door or a ladder in the walker's way; the
+  traveller swimming water it can't see across (it goes round, or says there is no way); a thing found by looking;
+  a whole task as one instruction; instructions typed in a terminal; rockets, and a glide to ground that isn't
+  flat.
 
 ## Its practice runs
 
