@@ -9,7 +9,8 @@ tick:
 - the feet don't stop on open ground between setting off and letting go;
 - the stop is a stop: forward let go, a tap after it at most, a sneak
   only very near;
-- it is there, within its margin, still, and looking where it was told;
+- it is there, within its margin, still, its look turning no more, and
+  looking where it was told;
 - it is never off the ground the way goes on, nor against a wall.
 
 The same record is read of the agent's own walkTo first: it arrives,
@@ -96,6 +97,7 @@ class WalkerTests(unittest.TestCase):
                          within)
     self.assertLess(last.speed, 0.01, 'still')
     self.assertEqual(set(), body.keys, 'every key let go')
+    self.assertEqual((0.0, 0.0), body.rate, 'and its look turning no more')
 
   def assertOnGround(self, body: WalkBody) -> None:
     for tick in body.track:
@@ -181,6 +183,41 @@ class WalkerTests(unittest.TestCase):
         self.assertOnGround(body)
         self.assertLessEqual(self.lookJump(body), Mouse.FASTEST + 1e-9)
 
+  def test_out_of_a_holes_corner_when_an_answer_came_late(self) -> None:
+    #  found in the game (2026-11-19): steering at a point ahead cut the
+    #  way's corner towards the hole it went round; its reckoning kept
+    #  it out of the hole and then found no step it could take. Here:
+    #  the same ground, every seventh request answered a tick late
+    holes = tuple((x, z) for x in (0, 1) for z in (3, 4, 5))
+    for late, pos in ((7, (0.5, 0.5)), (3, (0.6, 0.3)), (5, (0.3, 0.6))):
+      with self.subTest(late=late, pos=pos):
+        body = WalkBody(pos=pos, holes=holes, late=late)
+        Walker(Mouse(body)).walk(Vec3(0.5, 0.0, 8.5))
+        self.assertThere(body, (0.5, 8.5))
+        self.assertOnGround(body)
+
+  def test_round_holes_however_it_starts_and_whoever_is_late(self) -> None:
+    #  each hole's ground, from four looks, three places in its first
+    #  block, with every third, fifth and seventh request late: it is
+    #  there each time, and never off the ground
+    grounds = [ROUND[name] for name in ('a hole', 'a hole both sides')]
+    grounds.append(({'holes': tuple((x, z) for x in (0, 1)
+                                    for z in (3, 4, 5))}, (0.5, 8.5)))
+    walks = 0
+    for ground, place in grounds:
+      for yaw in (0.0, 64.0, -90.0, 180.0):
+        for late in (3, 5, 7):
+          for pos in ((0.5, 0.5), (0.7, 0.5), (0.3, 0.6)):
+            body = WalkBody(pos=pos, yaw=yaw, late=late, **ground)
+            Walker(Mouse(body)).walk(Vec3(place[0], 0.0, place[1]))
+            last = body.track[-1]
+            self.assertLessEqual(math.hypot(place[0] - last.x,
+                                            place[1] - last.z), 0.25)
+            self.assertEqual(0.0, min(tick.y for tick in body.track),
+                             (yaw, late, pos))
+            walks += 1
+    self.assertEqual(108, walks)
+
   def test_a_narrow_margin_is_kept(self) -> None:
     for name, place in OPEN.items():
       with self.subTest(place=name):
@@ -246,6 +283,17 @@ class WalkerTests(unittest.TestCase):
       Walker(Mouse(body)).walk(Vec3(0.5, 0.0, 8.5), ticks=10)
     self.assertIn('budget', str(raised.exception))
     self.assertEqual(set(), body.keys)
+    self.assertEqual((0.0, 0.0), body.rate, 'its look turning no more')
+
+  def test_a_walk_cut_short_as_it_turns_leaves_no_rate(self) -> None:
+    #  the place behind it, and a budget that ends in the turn
+    body = WalkBody()
+    with self.assertRaises(TesttimeError):
+      Walker(Mouse(body)).walk(Vec3(-3.5, 0.0, -5.5), ticks=6)
+    self.assertEqual((0.0, 0.0), body.rate)
+    at = body.yaw
+    body.ticks(5)
+    self.assertEqual(at, body.yaw, 'no head turning by itself')
 
   def test_the_same_walk_is_walked_the_same_way(self) -> None:
     first = self.walked(OPEN['behind and aside'])

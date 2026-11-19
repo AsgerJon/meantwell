@@ -5,16 +5,19 @@ walks from one block's middle to the next and ends in a sneak and a row
 of taps. The walker goes the same way, and
 
 - steers at a point ahead on the way, so a turn begins before its
-  corner and the track is a curve;
-- turns its head by the mouse, a part of the way each request, never
-  set outright;
+  corner and the track is a curve: the furthest such point it can walk
+  straight to on the way's ground, so that a corner is cut only where
+  what the way went round isn't in the cut;
+- turns its head by the mouse, a rate each tick, never set outright;
+- steers every tick, on the bearing each rate is answered with;
 - walks only where it looks, and only while the ticks it is bound to
   would keep it on the ground the way goes on;
 - stops by letting go where its own motion carries it there, with a
   tap after it when it stopped short.
 
 It asks a player's means and no others: perceive, keyDown, keyUp,
-ticks, and the mouse's look and toward. Its way is the terrain's, read
+ticks, and the mouse's (look, toward, ahead, rest and its bearing). Its
+way is the terrain's, read
 from one perception. A way with a door, a ladder, water, a jump or a
 drop in it isn't its yet: it says which, and whoever asked may ask the
 agent's walkTo for that stretch.
@@ -63,15 +66,15 @@ class Walker(Routine):
   #  How far off the way ahead its look may be for its feet to go, in
   #  degrees: wider off, the head comes round first
   WIDE = 60.0
-  #  How far its middle keeps from a column that isn't the way's ground
-  MARGIN = 0.2
+  #  How far its middle keeps from a column that isn't the way's ground;
+  #  and, once nearer than that, how far it may go to be out of it
+  MARGIN, OUT = 0.2, 0.3
   #  How it looks as it walks: this far down, in degrees
   DOWN = 8.0
   #  The ticks of forward it is bound to once it holds it, before a
-  #  letting go can be in force: a key's request, a look's two, the next
-  #  perception, and the request that lets go. And how many of those
-  #  pass before a look asked now is in force
-  BOUND, LAG = 5, 2
+  #  letting go can be in force: the request that turns, and the request
+  #  that lets go
+  BOUND = 2
   #  Stopped below this speed, in blocks a tick
   STOPPED = 0.003
   #  The least margin a walk ends within, as the agent's
@@ -110,10 +113,11 @@ class Walker(Routine):
 
   def __init__(self, body: Any) -> None:
     """The walker of 'body': a Mouse, for its toward."""
-    if not callable(getattr(body, 'toward', None)):
-      infoSpec = """a walker turns by the mouse: its body is a Mouse, with
-      'toward', not %r"""
-      raise TypeError(' '.join((infoSpec % (body,)).split()))
+    for name in ('toward', 'ahead', 'rest'):
+      if not callable(getattr(body, name, None)):
+        infoSpec = """a walker turns by the mouse: its body is a Mouse,
+        with '%s', not %r"""
+        raise TypeError(' '.join((infoSpec % (name, body)).split()))
     Routine.__init__(self, body)
 
   # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -175,7 +179,7 @@ class Walker(Routine):
       ticks = 100 + int(math.ceil(12 * pace.length(way)))
     last = seen.tick + ticks
     try:
-      self._along(way, ground, within, last)
+      self._along(seen, way, ground, within, last)
       seen = self._settle(way[-1], within, last)
     finally:
       self.letGo()
@@ -236,6 +240,28 @@ class Walker(Routine):
                for dx in (-self.MARGIN, self.MARGIN)
                for dz in (-self.MARGIN, self.MARGIN))
 
+  def _keeps(self, ground: set, x: float, z: float, track: list) -> bool:
+    """
+    Whether the places of 'track', gone to from (x, z), keep it on the
+    way's ground. Standing nearer than MARGIN to what isn't that ground
+    (an answer came late, and it went a tick further than it reckoned),
+    a track that brings it out is kept to from OUT blocks on.
+    """
+    free = 0.0 if self._on(ground, x, z) else self.OUT
+    return self._on(ground, *track[-1]) and all(
+      self._on(ground, *each) for each in track
+      if math.hypot(each[0] - x, each[1] - z) > free)
+
+  def _straight(self, ground: set, x: float, z: float,
+                aim: tuple) -> bool:
+    """Whether the straight line from (x, z) to 'aim' keeps it on the
+    way's ground, each tenth of a block of it."""
+    far = math.hypot(aim[0] - x, aim[1] - z)
+    parts = max(1, int(math.ceil(far / 0.1)))
+    return self._keeps(ground, x, z, [
+      (x + (aim[0] - x) * part / parts, z + (aim[1] - z) * part / parts)
+      for part in range(1, parts + 1)])
+
   def _rest(self, seen: Perception, yaws: list) -> list:
     """
     Where it is each tick from now, to rest: forward held for a tick
@@ -263,51 +289,57 @@ class Walker(Routine):
                        seen.pos.y, seen.pos.z)
     raise TesttimeError('walk', seen, ' '.join(info.split()))
 
-  def _along(self, way: tuple, ground: set, within: float,
+  def letGo(self) -> None:
+    """Every key it holds, let go, and the mouse at rest."""
+    Routine.letGo(self)
+    self.body.rest()
+
+  def _along(self, at: Any, way: tuple, ground: set, within: float,
              last: int) -> None:
     """
     The walk along the way, to where it lets go: steering at a point
     ahead, its feet going while its look is near the way's and the
-    ticks it is bound to keep it on the ground.
+    ticks it is bound to keep it on the ground. 'at' is its bearing to
+    begin with (what it perceived); from then on each tick's is the
+    mouse's.
     """
     whole, since, stuck = pace.length(way), 0.0, 0
     place = way[-1]
     while True:
-      seen = self._see()
-      self._spent(seen, last, place)
-      x, z = seen.pos.x, seen.pos.z
+      self.__now__ = at.tick
+      self._spent(at, last, place)
+      x, z = at.pos.x, at.pos.z
       since, _ = pace.abreast(way, x, z, since)
       short = math.hypot(place[0] - x, place[1] - z)
       going = self.holds('key.forward')
       if not going and short <= max(within, self.NEAR):
         return
-      now = seen.look.yaw
+      now = at.look.yaw
       if going and whole - since <= self.AHEAD:
-        #  where it comes to rest, let go now or some ticks on: the
-        #  letting go itself is a tick of forward
-        rests = [self._rest(seen, [now] * (1 + more))[-1]
-                 for more in range(self.BOUND)]
-        misses = [math.hypot(place[0] - at[0], place[1] - at[1])
-                  for at in rests]
-        best = misses.index(min(misses))
-        if best < self.BOUND - 1:
-          if best:
-            self.body.ticks(best)
+        #  where it comes to rest, let go now or a tick on: the letting
+        #  go itself is a tick of forward
+        misses = [math.hypot(place[0] - rest[0], place[1] - rest[1])
+                  for rest in (self._rest(at, [now] * held)[-1]
+                               for held in (1, 2))]
+        if misses[0] <= misses[1]:
           return
-      #  the furthest point ahead it could walk straight at from here,
-      #  were it looking there; its feet go when it nearly does, and the
-      #  ticks it is bound to, on the look it has by then, keep it on
-      #  the ground
-      go, wanted = False, None
-      for ahead in (self.AHEAD,) + self.NEARER:
-        wanted = pace.bearing(x, z, *pace.point(way, since + ahead))
-        if all(self._on(ground, *at) for at in self._rest(
-            seen, [wanted] * self.BOUND)):
-          off = pace.turned(now, wanted)
-          soon = now + min(max(off, -self.body.FASTEST), self.body.FASTEST)
-          yaws = [now] * self.LAG + [soon] * (self.BOUND - self.LAG)
-          go = abs(off) <= self.WIDE and all(
-            self._on(ground, *at) for at in self._rest(seen, yaws))
+      #  the furthest point ahead it can walk straight to from here on
+      #  the way's ground, as it moves now and were it looking there;
+      #  failing every one, the way itself, abreast of it. Its feet go
+      #  when it nearly looks there and the ticks it is bound to, on the
+      #  looks it will have, keep it on that ground
+      go, wanted = False, now
+      for ahead in (self.AHEAD,) + self.NEARER + (0.0,):
+        aim = pace.point(way, since + ahead)
+        if math.hypot(aim[0] - x, aim[1] - z) < self.LEAST:
+          continue
+        wanted = pace.bearing(x, z, *aim)
+        if self._straight(ground, x, z, aim) and self._keeps(
+            ground, x, z, self._rest(at, [wanted] * self.BOUND)):
+          yaws = [look[0] for look in self.body.ahead(
+            wanted, self.DOWN, self.BOUND)]
+          go = (abs(pace.turned(now, wanted)) <= self.WIDE and
+                self._keeps(ground, x, z, self._rest(at, yaws)))
           break
       if go or going:
         stuck = 0
@@ -316,10 +348,11 @@ class Walker(Routine):
         if stuck > self.STUCK:
           infoSpec = """no step keeps it on the way's ground, %.2f blocks
           short, at (%.2f, %.2f, %.2f)"""
-          info = infoSpec % (short, x, seen.pos.y, z)
-          raise TesttimeError('walk', seen, ' '.join(info.split()))
+          info = infoSpec % (short, x, at.pos.y, z)
+          raise TesttimeError('walk', at, ' '.join(info.split()))
       self._hold('key.forward', go)
       self.body.toward(wanted, self.DOWN)
+      at = self.body.bearing
 
   def _settle(self, place: tuple, within: float, last: int) -> Perception:
     """

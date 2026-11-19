@@ -1,0 +1,12 @@
+#  Apache-2.0 license
+#  Copyright (c) 2026 Asger Jon Vistisen
+#  The MCSR practice instance (SPEC.md 21.20): Minecraft 1.16.1 as Mojang ships it, no loader and no mods, unittas's
+#  own probe beside it, in a window large enough to watch (gamescope's own on the desktop, which shows without taking
+#  the focus). The map it plays is not here: a test opens it from tmp/, where it stays, its authors' work.
+#  A run asks for it by name: 'unittas run --instance mcsr.toml tests.game.test_mcsr', or that line without
+#  'unittas run' as a request to meantwell's watcher.
+minecraft = "1.16.1"
+client = "real"
+probe = "bundled"
+game = "run/mcsr"
+window = { width = 1280, height = 720, display = "nested" }

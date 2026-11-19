@@ -1,7 +1,8 @@
 """
 WalkBody: a body on the ground, without a game (not a test module
 itself), for the walker's tests (SPEC.md 21.23). It has the five means
-a routine asks and no others: perceive, keyDown, keyUp, look and ticks.
+a routine asks and the mouse's: perceive, keyDown, keyUp, look, ticks
+and mouseRate.
 
 The ground is whole blocks: a floor whose top is at height 0 over a
 span of columns, less the 'holes' (nothing, 'deep' blocks down); 'walls'
@@ -17,8 +18,11 @@ tick; it falls 0.08 a tick more each tick and keeps 0.98 of that. Not
 reckoned: a sneaking player kept from an edge.
 
 Every request waits for the end of the next tick first, as the probe
-runs a step there; a look is in force from the tick after and is
-answered at that one's end (two ticks, as the practice game's is).
+runs a step there. In each tick the look turns by the rate in force
+(mouseRate), after the body has moved by the look it had: the game turns
+it at every frame. A look set outright is there at that tick's end and
+stops the rate; a rate asked is in force from the tick after, and is
+answered with the bearing as it is before it acts.
 
 'track' keeps every tick: a Tick each, for the verdicts a walk is held
 to.
@@ -32,7 +36,9 @@ from collections import namedtuple
 
 from meantwell import pace
 from meantwell.glide import AIR, GRAVITY, GROUND, KEPT_Y
+from unittas.bearing import Bearing
 from unittas.box import Box
+from unittas.mouserate import MouseRate
 from unittas.nearblock import NearBlock
 from unittas.perception import Perception
 from unittas.values import BlockPos, Look, Vec3
@@ -54,14 +60,15 @@ class WalkBody:
   """
   The body, its feet at 'pos' (x, z) on the floor and looking 'yaw' to
   begin with. 'span' is the floor's columns: ((from x, to x), (from z,
-  to z)), each end with it. 'asked' holds each request's name, 'keys'
-  the keys held now, 'track' every tick.
+  to z)), each end with it. Every 'late'-th request is answered a tick
+  late (0: none). 'asked' holds each request's name, 'keys' the keys
+  held now, 'track' every tick.
   """
 
   def __init__(self, pos: tuple = (0.5, 0.5), yaw: float = 0.0,
                span: tuple = ((-12, 12), (-12, 12)), holes: tuple = (),
                walls: tuple = (), steps: tuple = (),
-               deep: int = 3) -> None:
+               deep: int = 3, late: int = 0) -> None:
     self.blocks = set()
     (fromX, toX), (fromZ, toZ) = span
     for x in range(fromX, toX + 1):
@@ -77,8 +84,10 @@ class WalkBody:
     self.x, self.y, self.z = float(pos[0]), 0.0, float(pos[1])
     self.vx, self.vy, self.vz = 0.0, -GRAVITY * KEPT_Y, 0.0
     self.yaw, self.pitch = float(yaw), 0.0
+    self.rate = 0.0, 0.0
     self.onGround, self.collided = True, False
     self.keys = set()
+    self.late = late
     self.tick = 0
     self.asked = []
     self.track = []
@@ -107,6 +116,7 @@ class WalkBody:
       motion=Vec3(self.vx, self.vy, self.vz), onGround=self.onGround,
       collidedHorizontally=self.collided,
       sneaking='key.sneak' in self.keys, blockReach=4.5,
+      mouseRate=MouseRate(self.rate[0], self.rate[1], 0),
       blocks=tuple(near))
 
   def keyDown(self, key: str) -> None:
@@ -120,7 +130,16 @@ class WalkBody:
   def look(self, yaw: float, pitch: float) -> None:
     self._request('look')
     self.yaw, self.pitch = float(yaw), float(pitch)
-    self._step()
+    self.rate = 0.0, 0.0
+    self.track[-1] = self.track[-1]._replace(yaw=self.yaw,
+                                             pitch=self.pitch)
+
+  def mouseRate(self, yaw: float, pitch: float) -> Bearing:
+    self._request('mouseRate')
+    self.rate = float(yaw), float(pitch)
+    return Bearing(tick=self.tick, pos=Vec3(self.x, self.y, self.z),
+                   look=Look(self.yaw, self.pitch),
+                   motion=Vec3(self.vx, self.vy, self.vz))
 
   def ticks(self, n: int = 1) -> int:
     self.asked.append('ticks')
@@ -131,9 +150,13 @@ class WalkBody:
   # ------------------------------------------------------------- the game
 
   def _request(self, name: str) -> None:
-    """A request: kept by name, and the tick it waits for passes."""
+    """A request: kept by name, and the tick it waits for passes; every
+    'late'-th one waits a tick more, as a game doesn't wait for the one
+    who asks."""
     self.asked.append(name)
     self._step()
+    if self.late and len(self.asked) % self.late == 0:
+      self._step()
 
   def _solid(self, minX: float, minY: float, minZ: float, maxX: float,
              maxY: float, maxZ: float) -> list:
@@ -195,6 +218,8 @@ class WalkBody:
     self.x, self.y, self.z = x, y, z
     self.vx, self.vz = vx * kept, vz * kept
     self.vy = (self.vy - GRAVITY) * KEPT_Y
+    self.yaw = (self.yaw + self.rate[0] + 180.0) % 360.0 - 180.0
+    self.pitch = min(max(self.pitch + self.rate[1], -90.0), 90.0)
     self.track.append(Tick(self.tick, x, y, z, self.yaw, self.pitch,
                            speed, heading, frozenset(held),
                            self.onGround))

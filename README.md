@@ -63,11 +63,11 @@ This robotic minecraft player tries to help you and follow your instructions.
   moves, each a value, played first in a world of blocks whose water runs by the game's own rule.
 - **A walk as a player walks:** `Walker(Mouse(body)).walk(place)` goes the way the agent's `walkTo` finds, and
   walks it as a hand and feet do. It steers at a point ahead on the way, so a turn begins before its corner and the
-  track is a curve. Its head is turned by the mouse a part at a time (`Mouse.toward`), never set in one jump. Its
-  feet go only where it looks, and only while the next ticks keep it on the way's ground. It stops by letting go
-  where its own motion carries it there. Tested without a game so far, on a body that moves as the ground has it:
-  where `walkTo`'s look jumps 90 to 177 degrees and its walk ends sneaking, the walker's look turns 30 degrees a
-  request at most and it never sneaks.
+  track is a curve. Its head is turned by the mouse: each tick `Mouse` gives the game a turning rate (unitTAS's
+  `mouse.rate`), and the game turns the look by it at every frame, so the look is never set in one jump. Its feet go
+  only where it looks, and only while the next ticks keep it on the way's ground. It stops by letting go where its
+  own motion carries it there. Where `walkTo`'s look jumps 50 to 146 degrees in a tick and its walk ends sneaking,
+  the walker's look turns 15 degrees a tick at most and it never sneaks.
 - **In a real game** (26.3, the practice instance in `unittas.toml`), by a player's inputs alone:
   - on flat ground the traveller arrived each time where `walkTo` alone stopped, and across natural terrain it
     arrived on five trips of 40 to 82 blocks;
@@ -80,12 +80,17 @@ This robotic minecraft player tries to help you and follow your instructions.
   - the glider, from a tower 40 high, came to rest within 1.8 blocks of places 70 to 200 blocks off on flat
     ground, eight glides of eight, each softly. Its model of the flight stayed within 0.04 blocks of the game's
     over flights of up to 520 ticks.
-- **Not yet:** its look turned at every frame (a request for a look takes two ticks, so a turn is still ten small
-  jumps a second: the frame-by-frame turn is asked of unitTAS); the walker in a game, and under the caster and
-  the traveller, which still walk by `walkTo`; a jump, a drop, a door or a ladder in the walker's way; the
-  traveller swimming water it can't see across (it goes round, or says there is no way); a thing found by looking;
-  a whole task as one instruction; instructions typed in a terminal; rockets, and a glide to ground that isn't
-  flat.
+  - the walker walked to places ahead, beside and behind it, round a wall and round a hole, stopping within 0.11
+    blocks each time, its look turning 12.6 degrees a tick at most and at every frame in between.
+- **On 1.16.1** (`mcsr.toml`), in the MCSR practice map (a save by Dibedy with packs by Mescht and Llama; it is
+  theirs and is not in this repository): the map opened with its datapacks; the robot typed `/trigger portals` into
+  the chat as a player does, used the practice's Start sign, and stood in its level by a lake of lava with what the
+  map hands a player: tools, a flint and steel, 16 planks and one bucket of water.
+- **Not yet:** the walker under the caster and the traveller, which still walk by `walkTo`; a jump, a drop, a door
+  or a ladder in the walker's way; the portal cast in the MCSR map's own level, with its planks and its one bucket;
+  what a sign says, read by the robot itself; the traveller swimming water it can't see across (it goes round, or
+  says there is no way); a thing found by looking; a whole task as one instruction; instructions typed in a
+  terminal; rockets, and a glide to ground that isn't flat.
 
 ## Its practice runs
 
